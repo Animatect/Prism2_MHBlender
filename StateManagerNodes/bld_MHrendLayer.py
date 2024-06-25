@@ -320,6 +320,7 @@ class MHrendLayerClass(object):
         self.le_dlGPUdevices.editingFinished.connect(self.gpuDevicesChanged)
         self.gb_passes.toggled.connect(self.stateManager.saveStatesToScene)
         self.b_addPasses.clicked.connect(self.showPasses)
+        self.b_setupLayer.clicked.connect(self.setupNodes)
         self.lw_passes.customContextMenuRequested.connect(self.rclickPasses)
         self.b_pathLast.clicked.connect(self.showLastPathMenu)
         self.lw_passes.itemDoubleClicked.connect(
@@ -920,6 +921,11 @@ class MHrendLayerClass(object):
     def gpuDevicesChanged(self):
         self.w_dlGPUpt.setEnabled(self.le_dlGPUdevices.text() == "")
         self.stateManager.saveStatesToScene()
+
+    @err_catcher(name=__name__)
+    def setupNodes(self):
+        layername = self.cb_renderLayer.currentText()
+        self.pluginMHfunctions.createOutputFromRL(layername=layername)
 
     @err_catcher(name=__name__)
     def showPasses(self):
