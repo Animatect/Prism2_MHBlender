@@ -997,6 +997,8 @@ class MHrendLayerClass(object):
         items = self.lw_passes.selectedItems()
         for i in items:
             self.pluginMHfunctions.removeAOV(i.text(), self.cb_renderLayer.currentText())
+        self.pluginMHfunctions.removeEmptyOutNodes(self.cb_renderLayer.currentText())
+        self.pluginMHfunctions.repositionLayerNodes(self.cb_renderLayer.currentText())
         self.updateUi()
 
     @err_catcher(name=__name__)

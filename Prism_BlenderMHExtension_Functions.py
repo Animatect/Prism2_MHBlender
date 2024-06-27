@@ -58,7 +58,7 @@ class Prism_BlenderMHExtension_Functions(object):
 "vector":"Vector",
 "z":"Depth",
 "denoising data": "Denoising",
-"debug samples":"DebugSamples",
+"debug samples":"Debug Sample Count",
 "shadow catcher":"Shadow Catcher",
 "volume direct":"VolumeDir",
 "volume indirect":"VolumeInd",
@@ -214,7 +214,38 @@ class Prism_BlenderMHExtension_Functions(object):
         return bool(self.getNodeAOVs())
 
     @err_catcher(name=__name__)
-    def removeAOVslot(self, layernodes:dict, nodetype:str, slotname:str)->None:
+    def repositionLayerNodes(self, layername:str)->None:
+        in_node = self.getRLNode(layername)
+        layernodesdict:dict = self.getLayerOutNodes(layername)
+        out_node = layernodesdict['main']
+        ##Cambiar la pos de Tech, Main y Crypto en Y dependiendo del numero de inputs que tenga
+        ## las dimensiones de un Outnode son 69.0 (con un pequeño buffer es 75.27) + 22*el número de inputs 
+        x_offset = (in_node.width + 240)
+        y_offset = 100
+        
+        out_node.location = in_node.location + mathutils.Vector((x_offset,0.0))
+        if layernodesdict['tech']:
+            out_node_tech = layernodesdict['tech']
+            y_dimension = 75.27 + (len(out_node_tech.inputs)*22)# + y_offset
+            out_node_tech.location = in_node.location + mathutils.Vector((x_offset,0.0))
+            #Ponemos el OutNode en relacion al TechNode
+            out_node.location = out_node_tech.location + mathutils.Vector((0,-y_dimension))
+        if layernodesdict['crypto']:
+            out_node_Crypto = layernodesdict['crypto']
+            y_dimension = 75.27 + (len(out_node_Crypto.inputs)*22)
+            out_node_y_dimension = 75.27 + (len(out_node.inputs)*22)
+            out_node_Crypto.location = out_node.location + mathutils.Vector((0,-out_node_y_dimension))
+
+    @err_catcher(name=__name__)
+    def removeEmptyOutNodes(self, layername:str)->None:
+        layernodesdict:dict = self.getLayerOutNodes(layername)
+        for node in list(layernodesdict.values()):
+            if node:
+                if len(node.inputs) < 1:
+                    bpy.context.scene.node_tree.nodes.remove(node)
+
+    @err_catcher(name=__name__)
+    def removeAOVSlot(self, layernodes:dict, nodetype:str, slotname:str)->None:
         if layernodes[nodetype]:
             print("nodetype: ", nodetype, ", slotname: ", slotname)
             inputs = layernodes[nodetype].inputs
@@ -226,19 +257,26 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def removeAOV(self, aovName:str, renderlayerName:str)->None:
         if True:#self.useNodeAOVs():
-            aovName:str = self.AOVDict[aovName.lower()]
+            nodeAovName:str = self.AOVDict[aovName.lower()]
             layernodesdict:dict = self.getLayerOutNodes(renderlayerName)            
-            slotname:str = self.getSlotname(renderlayerName, aovName)
+            slotname:str = self.getSlotname(renderlayerName, nodeAovName)
 
-            if self.compareTechPass(aovName):
-                self.removeAOVslot(layernodesdict, 'tech', slotname)
-            elif self.isCryptoPass(aovName):
+            if self.compareTechPass(nodeAovName):
+                self.removeAOVSlot(layernodesdict, 'tech', slotname)
+            elif self.isCryptoPass(nodeAovName):
                 # for Cryptos the slot has to be named like the pass.
-                slotname = aovName
-                self.removeAOVslot(layernodesdict, 'crypto', slotname)
+                cryptoindexes = ['00','01','02']
+                for cri in cryptoindexes:
+                    slotname = nodeAovName+cri
+                    self.removeAOVSlot(layernodesdict, 'crypto', slotname)
             else:
-                print("ismain")
-                self.removeAOVslot(layernodesdict, 'main', slotname)
+                if nodeAovName == "Denoising":
+                    denoisepasses = ['Normal','Albedo','Depth']
+                    for aov in denoisepasses:
+                        slotname = self.getSlotname(renderlayerName, nodeAovName+" "+aov)
+                        self.removeAOVSlot(layernodesdict, 'main', slotname)
+                else:
+                    self.removeAOVSlot(layernodesdict, 'main', slotname)
         
         self.enableViewLayerAOV(aovName, renderlayerName, enable=False)
 
@@ -254,12 +292,13 @@ class Prism_BlenderMHExtension_Functions(object):
         
         scene = bpy.context.scene
         curlayer = scene.view_layers[layername]
-
+        
         attrs = curAOV["parm"].split(".")
         obj = curlayer
         #Choose last index from splited string. example cycles.use_pass_volume_indirect we get use_pass_volume_indirect only.
-        # for a in attrs[:-1]:
-        #     obj = getattr(obj, a)
+        for a in attrs[:-1]:
+            # here the obj becomes layer.cycles or layer.eevee where is applicable instead of just layer
+            obj = getattr(obj, a)
 
         setattr(obj, attrs[-1], enable)
 
@@ -470,36 +509,7 @@ class Prism_BlenderMHExtension_Functions(object):
                 else:
                     self.connectNodes(nodetree, layername, o, out_node)
                 
-                # print(o.name)
-
-            # Remove unused connections if any
-            # if techEnabled:
-            #     self.removeUnconnectedInputs(out_node_tech)
-
-            # self.removeUnconnectedInputs(out_node)
-
-            # if cryptoOEnabled:
-            #     self.removeUnconnectedInputs(out_node_Crypto)
-
-            #Remove empty nodes
-
-
-
-            ##Cambiar la pos de Tech, Main y Crypto en Y dependiendo del numero de inputs que tenga
-            ## las dimensiones de un Outnode son 69.0 (con un pequeño buffer es 75.27) + 22*el número de inputs 
-            x_offset = (in_node.width + 240)
-            y_offset = 100
-            
-            out_node.location = in_node.location + mathutils.Vector((x_offset,0.0))
-            if techEnabled:
-                y_dimension = 75.27 + (len(out_node_tech.inputs)*22)# + y_offset
-                out_node_tech.location = in_node.location + mathutils.Vector((x_offset,0.0))
-                #Ponemos el OutNode en relacion al TechNode
-                out_node.location = out_node_tech.location + mathutils.Vector((0,-y_dimension))
-            if cryptoOEnabled or cryptoMEnabled or cryptoAEnabled:
-                y_dimension = 75.27 + (len(out_node_Crypto.inputs)*22)
-                out_node_y_dimension = 75.27 + (len(out_node.inputs)*22)
-                out_node_Crypto.location = out_node.location + mathutils.Vector((0,-out_node_y_dimension))
+            self.repositionLayerNodes(layername)
 
     ###########################
 
