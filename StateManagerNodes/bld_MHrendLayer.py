@@ -938,8 +938,6 @@ class MHrendLayerClass(object):
         if steps is None or len(steps) == 0:
             return False
 
-        print("steps: ", steps)
-
         if self.core.isStr(steps):
             steps = eval(steps)
 
@@ -957,6 +955,7 @@ class MHrendLayerClass(object):
         self.il.tw_steps.doubleClicked.connect(self.il.accept)
         self.il.tw_steps.horizontalHeaderItem(0).setText("Name")
         self.il.tw_steps.setColumnHidden(1, True)
+        self.il.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
         for i in sorted(steps, key=lambda s: s.lower()):
             rc = self.il.tw_steps.rowCount()
             self.il.tw_steps.insertRow(rc)
@@ -976,6 +975,7 @@ class MHrendLayerClass(object):
 
         self.updateUi()
         self.stateManager.saveStatesToScene()
+        self.setupNodes()
 
     @err_catcher(name=__name__)
     def rclickPasses(self, pos):

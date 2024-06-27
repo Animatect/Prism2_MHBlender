@@ -723,11 +723,6 @@ class Ui_wg_MHrendLayer(object):
 
         self.verticalLayout_5.addWidget(self.lw_passes)
 
-        self.b_getPasses = QPushButton(self.gb_passes)
-        self.b_getPasses.setObjectName(u"b_getPasses")
-
-        self.verticalLayout_5.addWidget(self.b_getPasses)
-
         self.b_addPasses = QPushButton(self.gb_passes)
         self.b_addPasses.setObjectName(u"b_addPasses")
         self.b_addPasses.setFocusPolicy(Qt.NoFocus)
@@ -878,7 +873,6 @@ class Ui_wg_MHrendLayer(object):
         self.l_dlGPUdevices.setText(QCoreApplication.translate("wg_MHrendLayer", u"Select GPU Devices:", None))
         self.le_dlGPUdevices.setPlaceholderText(QCoreApplication.translate("wg_MHrendLayer", u"Enter Valid GPU Device Id(s)", None))
         self.gb_passes.setTitle(QCoreApplication.translate("wg_MHrendLayer", u"Render Passes", None))
-        self.b_getPasses.setText(QCoreApplication.translate("wg_MHrendLayer", u"Get Passes From Layer", None))
         self.b_addPasses.setText(QCoreApplication.translate("wg_MHrendLayer", u"Add Passes", None))
 #if QT_CONFIG(tooltip)
         self.b_setupLayer.setToolTip(QCoreApplication.translate("wg_MHrendLayer", u"Sets up the Layer without assigning an output but creates the nodes, reconnects the outputs etc, this is different to execute in which the output is created.", None))

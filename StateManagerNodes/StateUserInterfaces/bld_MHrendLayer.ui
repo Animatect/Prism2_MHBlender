@@ -1436,13 +1436,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="b_getPasses">
-        <property name="text">
-         <string>Get Passes From Layer</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QPushButton" name="b_addPasses">
         <property name="focusPolicy">
          <enum>Qt::NoFocus</enum>

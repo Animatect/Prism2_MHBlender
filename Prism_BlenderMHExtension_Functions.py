@@ -33,6 +33,44 @@ class Prism_BlenderMHExtension_Functions(object):
         self.core = core
         self.plugin = plugin
         self.blenderplugin = self.core.appPlugin
+        self.AOVDict = self.lowercaseAOVdict({
+"ambient occlusion":"AO",
+"cryptomatte asset":"CryptoAsset",
+"cryptomatte material":"CryptoMaterial",
+"cryptomatte object":"CryptoObject",
+"diffuse color":"DiffCol",
+"diffuse direct":"DiffDir",
+"diffuse indirect":"DiffInd",
+"emission":"Emit",
+"environment":"Env",
+"glossy color":"GlossCol",
+"glossy direct":"GlossDir",
+"glossy indirect":"GlossInd",
+"material index":"IndexMA",
+"mist":"Mist",
+"normal":"Normal",
+"object index":"IndexOB",
+"position":"Position",
+"transmission color":"TransCol",
+"transmission direct":"TransDir",
+"transmission indirect":"TransInd",
+"uv":"UV",
+"vector":"Vector",
+"z":"Depth",
+"denoising data": "Denoising",
+"debug samples":"DebugSamples",
+"shadow catcher":"Shadow Catcher",
+"volume direct":"VolumeDir",
+"volume indirect":"VolumeInd",
+"bloom":"BloomCol",
+"transparent":"Transp",
+
+})
+        
+    @err_catcher(name=__name__)
+    def lowercaseAOVdict(self, original_dict:dict)->dict:
+        lowercase_dict = {key.lower(): value for key, value in original_dict.items()}
+        return lowercase_dict
 
     @err_catcher(name=__name__)
     def startup(self):
@@ -64,17 +102,12 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def sm_render_refreshPasses(self, origin):
         origin.lw_passes.clear()
+        
+        self.blenderplugin.canDeleteRenderPasses = True
+        passNames = self.getViewLayerAOVs(origin.cb_renderLayer.currentText())
+        logger.debug("viewlayer aovs: %s" % passNames)
 
-        passNames = self.getNodeAOVs()
-        logger.debug("node aovs: %s" % passNames)
-        origin.b_addPasses.setVisible(not passNames)
-        self.blenderplugin.canDeleteRenderPasses = bool(not passNames)
-        if not passNames:
-            passNames = self.getViewLayerAOVs(origin.cb_renderLayer.currentText())
-            logger.debug("viewlayer aovs: %s" % passNames)
-
-        if passNames:
-            origin.lw_passes.addItems(passNames)
+        origin.lw_passes.addItems(passNames)
 
     @err_catcher(name=__name__)
     def sm_render_addRenderPass(self, origin, passName, steps, layername):
@@ -124,7 +157,7 @@ class Prism_BlenderMHExtension_Functions(object):
         return passNames
 
     @err_catcher(name=__name__)
-    def getViewLayerAOVs(self, layername):
+    def getViewLayerAOVs(self, layername)->list:
         scene = bpy.context.scene
         availableAOVs = self.getAvailableAOVs(layername)
         # curlayer = bpy.context.window_manager.windows[0].view_layer
@@ -143,72 +176,72 @@ class Prism_BlenderMHExtension_Functions(object):
         return aovNames
 
     @err_catcher(name=__name__)
-    def getAvailableAOVs(self, layername):
+    def getAvailableAOVs(self, layername)->list:
         scene = bpy.context.scene
         # curlayer = bpy.context.window_manager.windows[0].view_layer
         curlayer = scene.view_layers[layername]
         aovParms = [x for x in dir(curlayer) if x.startswith("use_pass_")]
-        aovParms += [
-            "cycles." + x for x in dir(curlayer.cycles) if x.startswith("use_pass_")
-        ]
+        # AOVs inside the cycles list
+        if bpy.context.scene.render.engine == 'CYCLES':
+            aovParms += [
+                "cycles." + x for x in dir(curlayer.cycles) if x.startswith("use_pass_")
+            ]
+        elif bpy.context.scene.render.engine == 'BLENDER_EEVEE':
+            aovParms += [
+                "eevee." + x for x in dir(curlayer.eevee) if x.startswith("use_pass_")
+            ]
         aovs = [
             {"name": "Denoising Data", "parm": "cycles.denoising_store_passes"},
-            {"name": "Render Time", "parm": "cycles.pass_debug_render_time"},
+            {"name": "Debug Samples", "parm": "cycles.pass_debug_sample_count"},
         ]
         nameOverrides = {
             "Emit": "Emission",
         }
         for aov in aovParms:
-            name = aov.replace("use_pass_", "").replace("cycles.", "")
+            name = aov.replace("use_pass_", "").replace("cycles.", "").replace("eevee.","")
             name = [x[0].upper() + x[1:] for x in name.split("_")]
             name = " ".join(name)
             name = nameOverrides[name] if name in nameOverrides else name
-            aovs.append({"name": name, "parm": aov})
+            if(name.lower() in self.AOVDict.keys()):
+                aovs.append({"name": name, "parm": aov})
 
         aovs = sorted(aovs, key=lambda x: x["name"])
 
         return aovs
 
     @err_catcher(name=__name__)
-    def useNodeAOVs(self):
+    def useNodeAOVs(self)->bool:
         return bool(self.getNodeAOVs())
 
     @err_catcher(name=__name__)
-    def removeAOV(self, aovName, renderlayerName):
-        if self.useNodeAOVs():
-            rlayerNodes = [
-                x for x in bpy.context.scene.node_tree.nodes if x.type == "R_LAYERS"
-            ]
+    def removeAOVslot(self, layernodes:dict, nodetype:str, slotname:str)->None:
+        if layernodes[nodetype]:
+            print("nodetype: ", nodetype, ", slotname: ", slotname)
+            inputs = layernodes[nodetype].inputs
+            print("inputs:" ,inputs)
+            if slotname in inputs:
+                print(f'{slotname} in inputs')
+                inputs.remove(inputs[slotname])
 
-            for m in rlayerNodes:
-                connections = []
-                for i in m.outputs:
-                    if len(list(i.links)) > 0:
-                        connections.append(i.links[0])
-                        break
+    @err_catcher(name=__name__)
+    def removeAOV(self, aovName:str, renderlayerName:str)->None:
+        if True:#self.useNodeAOVs():
+            aovName:str = self.AOVDict[aovName.lower()]
+            layernodesdict:dict = self.getLayerOutNodes(renderlayerName)            
+            slotname:str = self.getSlotname(renderlayerName, aovName)
 
-                for i in connections:
-                    if i.to_node.type == "OUTPUT_FILE":
-                        for idx, k in enumerate(i.to_node.file_slots):
-                            links = i.to_node.inputs[idx].links
-                            if len(links) > 0:
-                                if links[0].from_socket.node != m:
-                                    continue
+            if self.compareTechPass(aovName):
+                self.removeAOVslot(layernodesdict, 'tech', slotname)
+            elif self.isCryptoPass(aovName):
+                # for Cryptos the slot has to be named like the pass.
+                slotname = aovName
+                self.removeAOVslot(layernodesdict, 'crypto', slotname)
+            else:
+                print("ismain")
+                self.removeAOVslot(layernodesdict, 'main', slotname)
+        
+        self.enableViewLayerAOV(aovName, renderlayerName, enable=False)
 
-                                passName = links[0].from_socket.name
-                                layerName = links[0].from_socket.node.layer
-
-                                if passName == "Image":
-                                    passName = "beauty"
-
-                                if (
-                                    passName == aovName.split("_", 1)[1]
-                                    and layerName == aovName.split("_", 1)[0]
-                                ):
-                                    i.to_node.inputs.remove(i.to_node.inputs[idx])
-                                    return
-        else:
-            self.enableViewLayerAOV(aovName, renderlayerName, enable=False)
 
     @err_catcher(name=__name__)
     def enableViewLayerAOV(self, name, layername, enable=True):
@@ -224,8 +257,9 @@ class Prism_BlenderMHExtension_Functions(object):
 
         attrs = curAOV["parm"].split(".")
         obj = curlayer
-        for a in attrs[:-1]:
-            obj = getattr(obj, a)
+        #Choose last index from splited string. example cycles.use_pass_volume_indirect we get use_pass_volume_indirect only.
+        # for a in attrs[:-1]:
+        #     obj = getattr(obj, a)
 
         setattr(obj, attrs[-1], enable)
 
@@ -237,81 +271,108 @@ class Prism_BlenderMHExtension_Functions(object):
 
     ######___FUNCIONES_SETPASS___######
     @err_catcher(name=__name__)
-    def setUpOutNode(self, out_node,basepath,label,depth, node_color, fformat):
+    def nodeNameExists(self, node_name):
+        node_tree = bpy.context.scene.node_tree
+        # Iterate through all nodes in the node tree
+        for node in node_tree.nodes:
+            if node.name == node_name:
+                return True
+        return False
+
+    @err_catcher(name=__name__)
+    def setUpOutNode(self, out_node, basepath, name, depth, node_color, fformat):
         out_node.width *= 2
         out_node.base_path = basepath
         out_node.format.file_format = fformat
         out_node.format.color_depth = str(depth)
         out_node.format.color_mode = 'RGBA'
         out_node.file_slots.remove(out_node.inputs[0])
-        out_node.label = label
+        out_node.name = name
+        out_node.label = name.replace("_", " ")
         out_node.use_custom_color = True
         out_node.color = node_color
         return out_node
 
     @err_catcher(name=__name__)
-    def connectNodes(self, nodetree, layername, renderpass, out_node, createSlot = True):
-        slotname = layername + "_" + renderpass.name + "_"
+    def getSlotname(self, layername, aovname):
+        if aovname == "Image":
+            aovname = "beauty"
+        return layername + "_" + aovname + "/" + layername + "_" + aovname + "_"
+
+    @err_catcher(name=__name__)
+    def connectNodes(self, nodetree, layername, renderpass, out_node)->None:
+        if renderpass.is_linked:
+            return
+        aovname = renderpass.name
+        slotname = self.getSlotname(layername, aovname)
+        # for Cryptos the slot has to be named like the pass.
         if "CryptoMatte" in out_node.label:
-            slotname = renderpass.name
-        if createSlot:
-            slot = out_node.file_slots.new(slotname)
+            slotname = aovname
+        # if already slot exists, connect to existing.
+        inputs_by_name = [p.name for p in out_node.inputs]
+        if slotname in inputs_by_name:
+            if not out_node.inputs[slotname].is_linked:
+                slot = out_node.inputs[slotname]
         else:
-            slot = out_node.inputs[slotname]
+            slot = out_node.file_slots.new(slotname)
         links = nodetree.links
         link = links.new(renderpass,slot)
 
     @err_catcher(name=__name__)
-    def checkTechPasses(self, currentpasses):
+    def checkTechPasses(self, currentpasses)->bool:
         for currentpass in currentpasses:
-            if self.compareTechPass(currentpass):
+            if self.compareTechPass(currentpass.name):
                 return True
         return False
     
     @err_catcher(name=__name__)
-    def compareTechPass(self, currentpass):
+    def compareTechPass(self, currentpassname:str)->bool:
         techPasses = ['Depth','Normal','UV','Vector','Mist','Position']
-        if currentpass.name in techPasses:
+        if currentpassname in techPasses:
             return True
         return False
 
     @err_catcher(name=__name__)
-    def hasCryptoObj(self, passesbyname):
+    def hasCryptoObj(self, passesbyname:list)->bool:
         return 'CryptoObject00' in passesbyname
     
     @err_catcher(name=__name__)
-    def hasCryptoMat(self, passesbyname):
+    def hasCryptoMat(self, passesbyname:list)->bool:
         return 'CryptoMaterial00' in passesbyname
     
     @err_catcher(name=__name__)
-    def hasCryptoAsset(self, passesbyname):
+    def hasCryptoAsset(self, passesbyname:list)->bool:
         return 'CryptoAsset00' in passesbyname
 
     @err_catcher(name=__name__)
-    def isCryptoPass(self, currentpass):
-        return 'Crypto' in currentpass.name
+    def isCryptoPass(self, currentpassname:str)->bool:
+        return 'Crypto' in currentpassname
 
     ## Output node making functions ##
     @err_catcher(name=__name__)
-    def make_output_node(self, node_path:str, node_label:str, img_bitdepth:int, color, fformat:str):
+    def get_output_node(self, node_path:str, node_name:str, img_bitdepth:int, color, fformat:str):
         nodetree = bpy.context.scene.node_tree
-        out_node = nodetree.nodes.new(type='CompositorNodeOutputFile')
-        out_node = self.setUpOutNode(out_node, node_path, node_label, img_bitdepth, color, fformat)
+        node_name = 'Prism_OUT_' + node_name
+        if self.nodeNameExists(node_name):
+            out_node = nodetree.nodes[node_name]
+        else:
+            out_node = nodetree.nodes.new(type='CompositorNodeOutputFile')
+            out_node = self.setUpOutNode(out_node, node_path, node_name, img_bitdepth, color, fformat)
         return out_node
 
     @err_catcher(name=__name__)
-    def make_MainOutode(self, allpath, layername):
-        out_node = self.make_output_node(allpath,layername+'_MainPasses', 16, (0.21, 0.37, 0.6), 'OPEN_EXR')
+    def get_MainOutode(self, allpath, layername):
+        out_node = self.get_output_node(allpath, layername+'_MainPasses', 16, (0.21, 0.37, 0.6), 'OPEN_EXR')
         return out_node
     
     @err_catcher(name=__name__)
-    def make_TecOuthNode(self, allpath, layername):
-        out_node = self.make_output_node(allpath,layername+'_TechPasses', 32, (0.6, 0.32, 0.2), 'OPEN_EXR')
+    def get_TecOuthNode(self, allpath, layername):
+        out_node = self.get_output_node(allpath,layername+'_TechPasses', 32, (0.6, 0.32, 0.2), 'OPEN_EXR')
         return out_node
     
     @err_catcher(name=__name__)
-    def make_CryptoOutNode(self, allpath, layername):
-        out_node = self.make_output_node(allpath + "/" + layername + "_CryptoMatte",layername+'_CryptoMatte', 32, (0.26, 0.6, 0.2), 'OPEN_EXR_MULTILAYER')
+    def get_CryptoOutNode(self, allpath, layername):
+        out_node = self.get_output_node(allpath + "/" + layername + "_CryptoMatte",layername+'_CryptoMatte', 32, (0.26, 0.6, 0.2), 'OPEN_EXR_MULTILAYER')
         return out_node
 
     @err_catcher(name=__name__)
@@ -341,7 +402,7 @@ class Prism_BlenderMHExtension_Functions(object):
 
     @err_catcher(name=__name__)
     def getRLNode(self, layername):
-        nodename = 'prism_RL_' + layername
+        nodename = 'Prism_RL_' + layername
         nodetree = bpy.context.scene.node_tree
         rendernodes = [n for n in nodetree.nodes if n.type == 'R_LAYERS']
         rendernode = None
@@ -370,18 +431,23 @@ class Prism_BlenderMHExtension_Functions(object):
     #El basepath va a ser: en Z  3DRender\\v00x\\
     @err_catcher(name=__name__)
     def createOutputFromRL(self, layername, basepath = ""):
+        if not bpy.context.scene.use_nodes:
+            bpy.context.scene.use_nodes = True
+            nodetree = bpy.context.scene.node_tree
+            # Eliminar el nodo de render layers por default
+            defaultNode = nodetree.nodes[1]
+            if defaultNode:
+                if defaultNode.type == 'R_LAYERS':
+                    if defaultNode.name == 'Render Layers':
+                        nodetree.nodes.remove(defaultNode)
+        
         nodetree = bpy.context.scene.node_tree
-        #selection = bpy.context.selected_nodes
         n = self.getRLNode(layername)
-        # sel = [n for n in nodetree.nodes if n.select]
-        #create output node from selected layer
-        # for n in sel:
-        #in_node = nodetree.nodes.active
         if n.type == 'R_LAYERS':
             in_node = n
-            layername = n.layer.replace(" ", "_")#si el nombre del layer tiene espacios hacel el cambio on thefly si no lo deja igual
+            # layername = n.layer.replace(" ", "_")#si el nombre del layer tiene espacios hacel el cambio on thefly si no lo deja igual
             allpath = basepath# + layername + "\\"
-            out_node = self.make_MainOutode(allpath, layername)
+            out_node = self.get_MainOutode(allpath, layername)
             enabled_passes = [p for p in in_node.outputs if p.enabled]
             passes_by_name = [p.name for p in enabled_passes]
             techEnabled = self.checkTechPasses(enabled_passes)
@@ -390,36 +456,50 @@ class Prism_BlenderMHExtension_Functions(object):
             cryptoAEnabled = self.hasCryptoAsset(passes_by_name)
             ##Checar si hay nodos que cuenten como TechPasses
             if techEnabled:
-                out_node_tech = self.make_TecOuthNode(allpath, layername)
+                out_node_tech = self.get_TecOuthNode(allpath, layername)
             #Checar los Cryptomattes
             if cryptoOEnabled or cryptoMEnabled or cryptoAEnabled:
-                out_node_Crypto = self.make_CryptoOutNode(allpath, layername)    
+                out_node_Crypto = self.get_CryptoOutNode(allpath, layername)    
 
             ##Hacer las conexiones
             for o in enabled_passes:
-                if self.compareTechPass(o):
+                if self.compareTechPass(o.name):
                     self.connectNodes(nodetree, layername, o, out_node_tech)
-                elif self.isCryptoPass(o):
+                elif self.isCryptoPass(o.name):
                     self.make_CryptoConnections(nodetree, layername, o, out_node_Crypto)
                 else:
                     self.connectNodes(nodetree, layername, o, out_node)
                 
                 # print(o.name)
 
+            # Remove unused connections if any
+            # if techEnabled:
+            #     self.removeUnconnectedInputs(out_node_tech)
+
+            # self.removeUnconnectedInputs(out_node)
+
+            # if cryptoOEnabled:
+            #     self.removeUnconnectedInputs(out_node_Crypto)
+
+            #Remove empty nodes
+
+
+
             ##Cambiar la pos de Tech, Main y Crypto en Y dependiendo del numero de inputs que tenga
-            x_offset = in_node.dimensions[0]+240
-            y_offset = 10
+            ## las dimensiones de un Outnode son 69.0 (con un pequeño buffer es 75.27) + 22*el número de inputs 
+            x_offset = (in_node.width + 240)
+            y_offset = 100
+            
+            out_node.location = in_node.location + mathutils.Vector((x_offset,0.0))
             if techEnabled:
-                y_dimension = 75.27554321289062 + (len(out_node_tech.inputs)*22) + y_offset
+                y_dimension = 75.27 + (len(out_node_tech.inputs)*22)# + y_offset
                 out_node_tech.location = in_node.location + mathutils.Vector((x_offset,0.0))
                 #Ponemos el OutNode en relacion al TechNode
-                out_node.location = in_node.location + mathutils.Vector((x_offset,-y_dimension))
-            else:
-                #en caso de no tener nada arriba              
-                out_node.location = in_node.location + mathutils.Vector((x_offset,0.0))
+                out_node.location = out_node_tech.location + mathutils.Vector((0,-y_dimension))
             if cryptoOEnabled or cryptoMEnabled or cryptoAEnabled:
-                y_dimension = 75.27554321289062 + (len(out_node_Crypto.inputs)*22)
-                out_node_Crypto.location = in_node.location + mathutils.Vector((x_offset,-(in_node.dimensions[1]-y_dimension)))
+                y_dimension = 75.27 + (len(out_node_Crypto.inputs)*22)
+                out_node_y_dimension = 75.27 + (len(out_node.inputs)*22)
+                out_node_Crypto.location = out_node.location + mathutils.Vector((0,-out_node_y_dimension))
 
     ###########################
 
@@ -457,6 +537,12 @@ class Prism_BlenderMHExtension_Functions(object):
 
     ###########################
     @err_catcher(name=__name__)
+    def removeUnconnectedInputs(self, node):
+        for i in node.inputs:
+            if len(i.links) == 0:
+                node.inputs.remove(i)
+
+    @err_catcher(name=__name__)
     def getAllNodesOfType(self, nodetype):
         #Get composite nodes
         nodes = bpy.context.scene.node_tree.nodes
@@ -472,37 +558,46 @@ class Prism_BlenderMHExtension_Functions(object):
         #node_exists = False
         slotname = layername + "_" + RenderLayerOutput.name + "_"
         print("createconnection")
-        if self.isCryptoPass(RenderLayerOutput):
+        if self.isCryptoPass(RenderLayerOutput.name):
             slotname = RenderLayerOutput.name
         for outfilenode in selectedoutfilenodes:#revisamos cada output node para ver si le toca recibir el output
             if comparestring in outfilenode.label:
                 node_exists = True
-                #cehcamos si existe el input y si no lo creamos
-                inputs_by_name = [p.name for p in outfilenode.inputs]
-                if slotname in inputs_by_name:                 
-                    self.connectNodes(nodetree, layername, RenderLayerOutput, outfilenode, False)
-                else:
-                    self.connectNodes(nodetree, layername, RenderLayerOutput, outfilenode)
-        # if node_exists:
-        #     return selectedoutfilenodes
-        # else:
-        #     if comparestring=='_TechPasses':
-        #         pass
-        #     if comparestring=='_CryptoMatte':
-        #         pass
-        #     if comparestring=='_MainPasses':
-        #         pass
-            
+                self.connectNodes(nodetree, layername, RenderLayerOutput, outfilenode)
+    
+
+    @err_catcher(name=__name__)
+    def getLayerOutNodes(self, layername) -> dict:
+        nodetree = bpy.context.scene.node_tree
+        outnodes = {
+            'main':None,
+            'tech':None,
+            'crypto':None,
+            }
+        nodename = 'Prism_OUT_' + layername + '_MainPasses'
+        if self.nodeNameExists(nodename):
+            outnodes['main'] = nodetree.nodes[nodename]
+        nodename = 'Prism_OUT_' + layername + '_TechPasses'
+        if self.nodeNameExists(nodename):
+            outnodes['tech'] = nodetree.nodes[nodename]
+        nodename = 'Prism_OUT_' + layername + '_CryptoMatte'
+        if self.nodeNameExists(nodename):
+            outnodes['crypto'] = nodetree.nodes[nodename]
+
+        return outnodes
+
+
     ##Checamos los outputs de el render layer activo y si no tiene conección se la hecemos.
     @err_catcher(name=__name__)
-    def reconnectToSelected(self, nodetree):
-        activenode = nodetree.nodes.active
+    def updateConnections(self, layername):
+        nodetree = bpy.context.scene.node_tree
+        layernode = self.getRLNode(layername)
         #Checamos si el activo es un renderlayer
-        if activenode.type == 'R_LAYERS':
-            #tomamos el nombre del layer
-            layername = activenode.layer.replace(" ", "_")
+        if layernode.type == 'R_LAYERS':
+            # #tomamos el nombre del layer
+            # layername = layernode.layer.replace(" ", "_")
             #tomamos los outputs habilitados
-            enabled_passes = [p for p in activenode.outputs if p.enabled]
+            enabled_passes = [p for p in layernode.outputs if p.enabled]
             #tomamos de los seleccionados los que son outputFile nodes
             sel = [n for n in nodetree.nodes if n.select]
             seloufi = [n for n in sel if n.type == 'OUTPUT_FILE']
@@ -510,9 +605,9 @@ class Prism_BlenderMHExtension_Functions(object):
             #si el output no tiene links
             for o in enabled_passes: #vemos los outputs del render layer activo
                 if not o.is_linked:#checamos si el output del render layer tiene conexiones, si no tiene seguimos
-                    if self.compareTechPass(o): #si el pass es un techpass
+                    if self.compareTechPass(o.name): #si el pass es un techpass
                         self.createConection(nodetree, layername, o, seloufi, '_TechPasses')
-                    elif self.isCryptoPass(o):
+                    elif self.isCryptoPass(o.name):
                         cryptoindex = ['00','01','02']
                         for i in cryptoindex:
                             if i in o.name:
