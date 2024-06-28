@@ -516,33 +516,19 @@ class Prism_BlenderMHExtension_Functions(object):
     ######___FUNCIONES_PATH___######
     #El basepath va a ser: en Z  3DRender\\v00x\\
     @err_catcher(name=__name__)
-    def setOutputsPaths(self, nodetree,basepath):
-        #tomamos los seleccionados los que son outputFile nodes
-        sel = [n for n in nodetree.nodes if n.select]
-        for n in sel:
-            #in_node = nodetree.nodes.active		
-            if n.type == 'OUTPUT_FILE':
-                #checar si tiene links para recoger el nombre de la layer
-                
-                layername = ''
-                for inp in n.inputs:
-                    if inp.is_linked:
-                        linkednode = inp.links[0].from_node #de que nodo viene
-                        if linkednode.type == 'R_LAYERS':
-                            layername = linkednode.layer #cual es el nombre de su layer
-                            break
-                    else:
-                        pass
-                #El Layername lo usabamos antes para crear subfolders por cada OutputFile.
-                allpath = basepath# + layername + "\\"
+    def setOutputsPaths(self, layername, basepath):
+        nodetree = bpy.context.scene.node_tree
+        layernodesdict:dict = self.getLayerOutNodes(layername)
+        for key, value in layernodesdict.items():
+            print('dakey: ',key,', davalue: ', value)
+            node = value
+            if node and node.type == 'OUTPUT_FILE':
+                allpath = os.path.normpath(basepath + "\\")
+                if key == 'crypto':
+                    allpath = os.path.normpath(os.path.join(allpath, layername + "_CryptoMatte"))
+                    print('crypto allpath: ', allpath)
 
-                #Checar si son TechPasses o CryptoPasses
-                if '_TechPasses' in n.label:
-                    allpath = allpath#+'TechPasses\\'
-                elif '_CryptoMatte' in n.label:
-                    allpath = allpath + "/" + layername + "_CryptoMatte"#+'CryptoMatte\\Cryptos_'
-
-                n.base_path = allpath
+                node.base_path = allpath
 
 
     ###########################
