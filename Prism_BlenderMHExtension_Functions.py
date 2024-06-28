@@ -213,9 +213,63 @@ class Prism_BlenderMHExtension_Functions(object):
     def useNodeAOVs(self)->bool:
         return bool(self.getNodeAOVs())
 
+    
     @err_catcher(name=__name__)
-    def repositionLayerNodes(self, layername:str)->None:
-        in_node = self.getRLNode(layername)
+    def getPatternedLayerNodes(self, pattern):
+        nodes = []
+        for node in bpy.context.scene.node_tree.nodes:
+            if node.type == 'R_LAYERS':
+                if node.name == pattern + node.layer:
+                    nodes.append(node)
+        return nodes
+
+    @err_catcher(name=__name__)
+    def sortNodesByYposition(self, nodes:list)->list:
+        return sorted(nodes, key=lambda node: node.location.y, reverse=True)
+    
+    @err_catcher(name=__name__)
+    def getRLDimensions(self, renderlayernode)->float:
+        outs = [o for o in renderlayernode.outputs if o.enabled == True]
+        basedimension:float = 79
+        buffer:float = 100
+        outputdimension:float = 22
+
+        return (basedimension + buffer + (len(outs)*outputdimension))
+         
+
+    @err_catcher(name=__name__)
+    def repositionRenderLayerNodes(self)->None:
+        nodes:list = self.getPatternedLayerNodes('Prism_RL_')
+        sorted_nodes:list = self.sortNodesByYposition(nodes)
+        for n in sorted_nodes:
+            print(n.name, ": ", n.location)
+        y_offset:float = 0
+        current_y:float = sorted_nodes[0].location.y
+        current_x:float = sorted_nodes[0].location.x
+        for node in sorted_nodes:
+            layername:str = node.layer
+            node.location = mathutils.Vector((current_x,current_y))
+            self.repositionLayerOutNodes(layername=layername, in_node=node)
+            out_node_dimensions:float = 0.0
+            layernodesdict:dict = self.getLayerOutNodes(layername)
+            if layernodesdict['main']:
+                out_node_dimensions += (75.27 + (len(layernodesdict['main'].inputs) * 22))
+            if layernodesdict['tech']:
+                out_node_dimensions += (75.27 + (len(layernodesdict['tech'].inputs) * 22))
+            if layernodesdict['crypto']:
+                out_node_dimensions += (75.27 + (len(layernodesdict['crypto'].inputs) * 22))
+            
+            max_dimension = out_node_dimensions
+            if self.getRLDimensions(node) > max_dimension:
+                max_dimension = self.getRLDimensions(node)
+            
+            current_y -= max_dimension + y_offset
+
+
+    @err_catcher(name=__name__)
+    def repositionLayerOutNodes(self, layername:str, in_node=None)->None:
+        if not in_node:
+            in_node = self.getRLNode(layername)
         layernodesdict:dict = self.getLayerOutNodes(layername)
         out_node = layernodesdict['main']
         ##Cambiar la pos de Tech, Main y Crypto en Y dependiendo del numero de inputs que tenga
@@ -427,9 +481,7 @@ class Prism_BlenderMHExtension_Functions(object):
         lowest_y_node = None
         nodetree = bpy.context.scene.node_tree
         rendernodes = [n for n in nodetree.nodes if n.type == 'R_LAYERS']
-        print("rn: ", rendernodes)
         if len(rendernodes) < 1:
-            print("aca")
             return None, mathutils.Vector((0,0))
         
         for n in rendernodes:
@@ -449,12 +501,19 @@ class Prism_BlenderMHExtension_Functions(object):
             if n.layer == layername:
                 if n.name == nodename:
                     rendernode = n
-        
+
         if not rendernode:
-            lowernode, lowerloc = self.lastRLlocation()
-            y_offset = 0
-            if lowernode:
-                y_offset = lowernode.dimensions[1]*0.5 # 50% del tamaño del nodo
+            nodes:list = self.getPatternedLayerNodes('Prism_RL_')
+            sorted_nodes:list = self.sortNodesByYposition(nodes)
+
+            if len(sorted_nodes) > 0:
+                lowernode =  sorted_nodes[-1]
+                lowerloc = lowernode.location
+                y_offset = self.getRLDimensions(lowernode)
+            else:
+                lowernode = None
+                lowerloc = mathutils.Vector((0,0))
+                y_offset = 0
             layer_node = nodetree.nodes.new(type='CompositorNodeRLayers')
             layer_node.name = nodename
             layer_node.label = "Prism RL " + layername
@@ -467,30 +526,25 @@ class Prism_BlenderMHExtension_Functions(object):
     # mute nodes if layer is disabled
     @err_catcher(name=__name__)
     def toggleLayerNodes(self, layername:str, toggle:bool)->None:
-        print("en las funciones el toggle es: ", toggle)
         nodename = 'Prism_RL_' + layername
         nodetree = bpy.context.scene.node_tree
         rendernodes = [n for n in nodetree.nodes if n.type == 'R_LAYERS']
         rendernode = None
         for n in rendernodes:
-            print("1")
             if n.layer == layername:
-                print("2")
                 if n.name == nodename:
-                    print("3")
                     rendernode = n
         if rendernode:
-            print("4")
             layernodesdict:dict = self.getLayerOutNodes(layername)
             for out_node in list(layernodesdict.values()):
                 if out_node:
-                    print(out_node.name)
                     out_node.mute = toggle
             rendernode.mute = toggle
     
     ##################################
 
     ##FUNCION PRINCIPAL
+    # !CallFromMHRendLayer
     @err_catcher(name=__name__)
     def createOutputFromRL(self, layername, basepath = ""):
         if not bpy.context.scene.use_nodes:
@@ -507,8 +561,7 @@ class Prism_BlenderMHExtension_Functions(object):
         n = self.getRLNode(layername)
         if n.type == 'R_LAYERS':
             in_node = n
-            # layername = n.layer.replace(" ", "_")#si el nombre del layer tiene espacios hacel el cambio on thefly si no lo deja igual
-            allpath = basepath# + layername + "\\"
+            allpath = basepath
             out_node = self.get_MainOutode(allpath, layername)
             enabled_passes = [p for p in in_node.outputs if p.enabled]
             passes_by_name = [p.name for p in enabled_passes]
@@ -532,12 +585,13 @@ class Prism_BlenderMHExtension_Functions(object):
                 else:
                     self.connectNodes(nodetree, layername, o, out_node)
                 
-            self.repositionLayerNodes(layername)
+            # self.repositionLayerOutNodes(layername)
+            self.repositionRenderLayerNodes()
 
     ###########################
 
     ######___FUNCIONES_PATH___######
-    #El basepath va a ser: en Z  3DRender\\v00x\\
+    # !CallFromMHRendLayer
     @err_catcher(name=__name__)
     def setOutputsPaths(self, layername, basepath):
         nodetree = bpy.context.scene.node_tree
@@ -560,31 +614,7 @@ class Prism_BlenderMHExtension_Functions(object):
         for i in node.inputs:
             if len(i.links) == 0:
                 node.inputs.remove(i)
-
-    @err_catcher(name=__name__)
-    def getAllNodesOfType(self, nodetype):
-        #Get composite nodes
-        nodes = bpy.context.scene.node_tree.nodes
-        #get nodes of type
-        sel = [n for n in nodes if n.type == nodetype]
-        #loop through nodes
-        for n in sel:
-                n.select = True
-
-    #!!!!!!!!!!!!!!!!!!--Hay que checar que los outs solo sean los conectados al render layer seleccionado--!!!!!!!!!!!!!!!!!!!!
-    @err_catcher(name=__name__)
-    def createConection(self, nodetree, layername, RenderLayerOutput, selectedoutfilenodes, comparestring):
-        #node_exists = False
-        slotname = layername + "_" + RenderLayerOutput.name + "_"
-        print("createconnection")
-        if self.isCryptoPass(RenderLayerOutput.name):
-            slotname = RenderLayerOutput.name
-        for outfilenode in selectedoutfilenodes:#revisamos cada output node para ver si le toca recibir el output
-            if comparestring in outfilenode.label:
-                node_exists = True
-                self.connectNodes(nodetree, layername, RenderLayerOutput, outfilenode)
-    
-
+  
     @err_catcher(name=__name__)
     def getLayerOutNodes(self, layername) -> dict:
         nodetree = bpy.context.scene.node_tree
@@ -606,31 +636,4 @@ class Prism_BlenderMHExtension_Functions(object):
         return outnodes
 
 
-    ##Checamos los outputs de el render layer activo y si no tiene conección se la hecemos.
-    @err_catcher(name=__name__)
-    def updateConnections(self, layername):
-        nodetree = bpy.context.scene.node_tree
-        layernode = self.getRLNode(layername)
-        #Checamos si el activo es un renderlayer
-        if layernode.type == 'R_LAYERS':
-            # #tomamos el nombre del layer
-            # layername = layernode.layer.replace(" ", "_")
-            #tomamos los outputs habilitados
-            enabled_passes = [p for p in layernode.outputs if p.enabled]
-            #tomamos de los seleccionados los que son outputFile nodes
-            sel = [n for n in nodetree.nodes if n.select]
-            seloufi = [n for n in sel if n.type == 'OUTPUT_FILE']
 
-            #si el output no tiene links
-            for o in enabled_passes: #vemos los outputs del render layer activo
-                if not o.is_linked:#checamos si el output del render layer tiene conexiones, si no tiene seguimos
-                    if self.compareTechPass(o.name): #si el pass es un techpass
-                        self.createConection(nodetree, layername, o, seloufi, '_TechPasses')
-                    elif self.isCryptoPass(o.name):
-                        cryptoindex = ['00','01','02']
-                        for i in cryptoindex:
-                            if i in o.name:
-                                self.createConection(nodetree, layername, o, seloufi, '_CryptoMatte')
-                    else:
-                        self.createConection(nodetree, layername, o, seloufi, '_MainPasses')
-        

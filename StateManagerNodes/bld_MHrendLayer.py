@@ -723,7 +723,6 @@ class MHrendLayerClass(object):
     @err_catcher(name=__name__)
     def sm_toggleLayerNodes(self, *args, **kwargs)->None:
         toggle = self.state.text(0).endswith(" - disabled")
-        print("en el layer el toggle es: ", toggle)
         self.pluginMHfunctions.toggleLayerNodes(self.cb_renderLayer.currentText(), toggle)
 
 
@@ -1008,7 +1007,8 @@ class MHrendLayerClass(object):
         for i in items:
             self.pluginMHfunctions.removeAOV(i.text(), self.cb_renderLayer.currentText())
         self.pluginMHfunctions.removeEmptyOutNodes(self.cb_renderLayer.currentText())
-        self.pluginMHfunctions.repositionLayerNodes(self.cb_renderLayer.currentText())
+        # self.pluginMHfunctions.repositionLayerOutNodes(self.cb_renderLayer.currentText())
+        self.pluginMHfunctions.repositionRenderLayerNodes()
         self.updateUi()
 
     @err_catcher(name=__name__)
