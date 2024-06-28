@@ -156,6 +156,8 @@ class MHrendLayerClass(object):
         else:
             self.initializeContextBasedSettings()
         
+        # Connect the toggle event for the whole thing
+        self.stateManager.tw_export.itemChanged.connect(self.sm_toggleLayerNodes)
 
     @err_catcher(name=__name__)
     def loadData(self, data):
@@ -716,6 +718,14 @@ class MHrendLayerClass(object):
             return True
 
         return False
+
+    
+    @err_catcher(name=__name__)
+    def sm_toggleLayerNodes(self, *args, **kwargs)->None:
+        toggle = self.state.text(0).endswith(" - disabled")
+        print("en el layer el toggle es: ", toggle)
+        self.pluginMHfunctions.toggleLayerNodes(self.cb_renderLayer.currentText(), toggle)
+
 
     @err_catcher(name=__name__)
     def updateUi(self):

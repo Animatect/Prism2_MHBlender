@@ -464,10 +464,33 @@ class Prism_BlenderMHExtension_Functions(object):
 
         return rendernode
 
+    # mute nodes if layer is disabled
+    @err_catcher(name=__name__)
+    def toggleLayerNodes(self, layername:str, toggle:bool)->None:
+        print("en las funciones el toggle es: ", toggle)
+        nodename = 'Prism_RL_' + layername
+        nodetree = bpy.context.scene.node_tree
+        rendernodes = [n for n in nodetree.nodes if n.type == 'R_LAYERS']
+        rendernode = None
+        for n in rendernodes:
+            print("1")
+            if n.layer == layername:
+                print("2")
+                if n.name == nodename:
+                    print("3")
+                    rendernode = n
+        if rendernode:
+            print("4")
+            layernodesdict:dict = self.getLayerOutNodes(layername)
+            for out_node in list(layernodesdict.values()):
+                if out_node:
+                    print(out_node.name)
+                    out_node.mute = toggle
+            rendernode.mute = toggle
+    
     ##################################
 
     ##FUNCION PRINCIPAL
-    #El basepath va a ser: en Z  3DRender\\v00x\\
     @err_catcher(name=__name__)
     def createOutputFromRL(self, layername, basepath = ""):
         if not bpy.context.scene.use_nodes:

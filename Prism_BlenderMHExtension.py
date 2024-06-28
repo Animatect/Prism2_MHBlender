@@ -31,6 +31,13 @@ class MHBlenderExtension:
         self.version = "v0.0.1"
         self.functions = None
         self.customstates = ["bld_MHRender", "bld_MHrendLayer"]
+
+        # # check if Blender plugin is loaded
+        # blPlugin = self.core.getPlugin("Blender")
+        # if blPlugin:
+        #     # if yes, patch the function
+        #     print("se cargó el plugin de blender para monkeypatch")
+        #     self.applyPatch(blPlugin)
         
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
@@ -39,17 +46,31 @@ class MHBlenderExtension:
     def onStateManagerOpen(self, origin):
         for customstate in self.customstates:
             if self.core.appPlugin.appShortName.lower() == "bld":
-                # if not self.functions:
-                #     import Prism_BlenderMHExtension_Functions
-                #     self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 self.stateTypeCreator(customstate, origin)
     
     @err_catcher(name=__name__)
-    def onPluginLoaded(self, pluginName):
+    def onPluginLoaded(self, plugin):
         if not self.functions:
             if self.core.appPlugin.appShortName.lower() == "bld":
                 import Prism_BlenderMHExtension_Functions
                 self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
+                # self.applyPatch(plugin)
+
+    # We piggybag in a function called by the state manager when a state is enabled/disabled
+    # @err_catcher(name=__name__)
+    # def applyPatch(self, plugin):
+    #     self.core.plugins.monkeyPatch(plugin.sm_saveStates, self.sm_saveStates, self, force=True)
+
+    # @err_catcher(name=__name__)
+    # def sm_saveStates(self, *args, **kwargs):
+    #     self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_saveStates, *args, **kwargs)
+    #     # check if pass nodes should be disabled
+    #     sm = args[0]
+    #     for i in range(sm.tw_export.topLevelItemCount()):
+    #         item = sm.tw_export.topLevelItem(i)
+    #         if item.checkState(0) == Qt.Checked:
+    #             item.ui.sm_toggleLayerNodes(toggle=item.text(0).endswith(" - disabled"))
+    ### MonkeyPatch ends.
 
     @err_catcher(name=__name__)
     def stateTypeCreator(self, stateName, stateManager):
@@ -96,14 +117,4 @@ class %s(QWidget, %s.%s, %s.%sClass):
             classDef = eval(stateNameBase + "Class")
             stateManager.loadState(classDef)
 
-
-
-
-# import Blender_MHRender
-# import Blender_MHRender_ui
-
-# class MHRenderClass(QWidget, Blender_MHRender_ui.Ui_wg_MHRender, Blender_MHRender.MHRenderClass):
-#     def __init__(self):
-#         QWidget.__init__(self)
-#         self.setupUi(self)
 
