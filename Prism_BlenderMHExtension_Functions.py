@@ -67,6 +67,8 @@ class Prism_BlenderMHExtension_Functions(object):
 
 })
         
+        self.core.registerCallback("onStateDeleted", self.onStateDeleted, plugin=self)
+        
     @err_catcher(name=__name__)
     def lowercaseAOVdict(self, original_dict:dict)->dict:
         lowercase_dict = {key.lower(): value for key, value in original_dict.items()}
@@ -246,30 +248,31 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def repositionRenderLayerNodes(self)->None:
         nodes:list = self.getPatternedLayerNodes('Prism_RL_')
-        sorted_nodes:list = self.sortNodesByYposition(nodes)
-        for n in sorted_nodes:
-            print(n.name, ": ", n.location)
-        y_offset:float = 0
-        current_y:float = sorted_nodes[0].location.y
-        current_x:float = sorted_nodes[0].location.x
-        for node in sorted_nodes:
-            layername:str = node.layer
-            node.location = mathutils.Vector((current_x,current_y))
-            self.repositionLayerOutNodes(layername=layername, in_node=node)
-            out_node_dimensions:float = 0.0
-            layernodesdict:dict = self.getLayerOutNodes(layername)
-            if layernodesdict['main']:
-                out_node_dimensions += (75.27 + (len(layernodesdict['main'].inputs) * 22))
-            if layernodesdict['tech']:
-                out_node_dimensions += (75.27 + (len(layernodesdict['tech'].inputs) * 22))
-            if layernodesdict['crypto']:
-                out_node_dimensions += (75.27 + (len(layernodesdict['crypto'].inputs) * 22))
-            
-            max_dimension = out_node_dimensions
-            if self.getRLDimensions(node) > max_dimension:
-                max_dimension = self.getRLDimensions(node)
-            
-            current_y -= max_dimension + y_offset
+        if len(nodes) > 0:
+            sorted_nodes:list = self.sortNodesByYposition(nodes)
+            for n in sorted_nodes:
+                print(n.name, ": ", n.location)
+            y_offset:float = 0
+            current_y:float = sorted_nodes[0].location.y
+            current_x:float = sorted_nodes[0].location.x
+            for node in sorted_nodes:
+                layername:str = node.layer
+                node.location = mathutils.Vector((current_x,current_y))
+                self.repositionLayerOutNodes(layername=layername, in_node=node)
+                out_node_dimensions:float = 0.0
+                layernodesdict:dict = self.getLayerOutNodes(layername)
+                if layernodesdict['main']:
+                    out_node_dimensions += (75.27 + (len(layernodesdict['main'].inputs) * 22))
+                if layernodesdict['tech']:
+                    out_node_dimensions += (75.27 + (len(layernodesdict['tech'].inputs) * 22))
+                if layernodesdict['crypto']:
+                    out_node_dimensions += (75.27 + (len(layernodesdict['crypto'].inputs) * 22))
+                
+                max_dimension = out_node_dimensions
+                if self.getRLDimensions(node) > max_dimension:
+                    max_dimension = self.getRLDimensions(node)
+                
+                current_y -= max_dimension + y_offset
 
 
     @err_catcher(name=__name__)
@@ -603,13 +606,11 @@ class Prism_BlenderMHExtension_Functions(object):
         nodetree = bpy.context.scene.node_tree
         layernodesdict:dict = self.getLayerOutNodes(layername)
         for key, value in layernodesdict.items():
-            print('dakey: ',key,', davalue: ', value)
             node = value
             if node and node.type == 'OUTPUT_FILE':
                 allpath = os.path.normpath(basepath + "\\")
                 if key == 'crypto':
                     allpath = os.path.normpath(os.path.join(allpath, layername + "_CryptoMatte"))
-                    print('crypto allpath: ', allpath)
 
                 node.base_path = allpath
 
@@ -642,4 +643,31 @@ class Prism_BlenderMHExtension_Functions(object):
         return outnodes
 
 
+    ######################################
+    #                                    #
+    #######       CALLBACKS       ########
+    #                                    #
+    ######################################
 
+    @err_catcher(name=__name__)
+    def onStateDeleted(self, stateManager, state, *args, **kwargs)->None:
+        if state.className == "MHrendLayer":
+            layername = state.cb_renderLayer.currentText()
+            try:
+                rlnode = bpy.context.scene.node_tree.nodes['Prism_RL_' + layername]
+            except:
+                rlnode = None
+            if rlnode:
+                message = f"Delete nodes asociated with this Layer?"
+                result = self.core.popupQuestion(
+                    message,
+                    title="Create new Layer?",
+                )
+                if result == "Yes":                    
+                    layernodesdict:dict = self.getLayerOutNodes(layername)
+                    for l in list(layernodesdict.values()):
+                        if l:
+                            bpy.context.scene.node_tree.nodes.remove(l)
+                    bpy.context.scene.node_tree.nodes.remove(rlnode)
+                    self.repositionRenderLayerNodes()
+            

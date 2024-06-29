@@ -588,6 +588,17 @@ class MHrendLayerClass(object):
     def getSortKey(self):
         return self.getTaskname()
     
+    # Recursive function where usedlayers is a persistent list which keeps being updated.
+    @err_catcher(name=__name__)
+    def check_items(self, item, usedlayers:list):
+        if item.ui.className == "MHrendLayer":
+            layername = item.ui.cb_renderLayer.currentText()
+            usedlayers.append(layername)
+    
+        for i in range(item.childCount()):
+            child_item = item.child(i)
+            self.check_items(child_item, usedlayers)
+
     @err_catcher(name=__name__)
     def is_RenderLayerCb_used(self)->bool:
         treewidget = self.stateManager.tw_export
@@ -595,9 +606,7 @@ class MHrendLayerClass(object):
         usedlayers=[]
         for i in range(treewidget.topLevelItemCount()):
             item = treewidget.topLevelItem(i)
-            if item.ui.className == "MHrendLayer":
-                layername = item.ui.cb_renderLayer.currentText()
-                usedlayers.append(layername)
+            self.check_items(item, usedlayers)
         # make layers unique
         usedlayers = set(usedlayers)
         if self.cb_renderLayer.currentText() in usedlayers:
@@ -610,7 +619,6 @@ class MHrendLayerClass(object):
             else:
                 # No layers remaining
                 arelayersremaining = False
-
             return True, arelayersremaining
         else:
             return False, arelayersremaining
