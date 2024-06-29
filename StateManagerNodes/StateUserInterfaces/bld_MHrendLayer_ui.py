@@ -384,7 +384,7 @@ class Ui_wg_MHrendLayer(object):
         self.cb_renderLayer = QComboBox(self.f_renderLayer)
         self.cb_renderLayer.setObjectName(u"cb_renderLayer")
         self.cb_renderLayer.setEnabled(True)
-        self.cb_renderLayer.setMinimumSize(QSize(150, 0))
+        self.cb_renderLayer.setMinimumSize(QSize(250, 0))
 
         self.horizontalLayout_5.addWidget(self.cb_renderLayer)
 

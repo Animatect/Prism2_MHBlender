@@ -60,6 +60,7 @@ class MHrendLayerClass(object):
         self.cb_context.addItems(["From scenefile", "Custom"])
         
         self.pluginMHfunctions = self.core.getPlugin("MHBlenderExtension").functions
+        # self.markfordeletion = False
 
         self.curCam = None
         self.renderingStarted = False
@@ -95,6 +96,8 @@ class MHrendLayerClass(object):
         
         self.w_context.setVisible(False)
         # self.f_taskname.setVisible(False)
+        self.b_changeTask.setVisible(False)
+        self.label_2.setVisible(False)
         self.l_name.setVisible(False)
         self.e_name.setVisible(False)
         self.f_range.setVisible(False)
@@ -156,8 +159,11 @@ class MHrendLayerClass(object):
         else:
             self.initializeContextBasedSettings()
         
-        # Connect the toggle event for the whole thing
+        # Connect the toggle event for the whole thing.
         self.stateManager.tw_export.itemChanged.connect(self.sm_toggleLayerNodes)
+
+        # Check if the layer is selected and change it.
+        self.on_RenderLayerCb_setup()
 
     @err_catcher(name=__name__)
     def loadData(self, data):
@@ -297,8 +303,7 @@ class MHrendLayerClass(object):
         self.b_resPresets.clicked.connect(self.showResPresets)
         self.cb_master.activated.connect(self.stateManager.saveStatesToScene)
         self.cb_outPath.activated.connect(self.stateManager.saveStatesToScene)
-        self.cb_renderLayer.activated.connect(self.on_RenderLayerCb_changed)#(self.stateManager.saveStatesToScene)
-        # self.cb_renderLayer.currentIndexChanged.connect(self.on_RenderLayerCb_changed)
+        self.cb_renderLayer.activated.connect(self.on_RenderLayerCb_changed)
         self.cb_format.activated.connect(self.stateManager.saveStatesToScene)
         self.gb_submit.toggled.connect(self.rjToggled)
         self.cb_manager.activated.connect(self.managerChanged)
@@ -584,12 +589,115 @@ class MHrendLayerClass(object):
         return self.getTaskname()
     
     @err_catcher(name=__name__)
+    def is_RenderLayerCb_used(self)->bool:
+        treewidget = self.stateManager.tw_export
+        arelayersremaining = True
+        usedlayers=[]
+        for i in range(treewidget.topLevelItemCount()):
+            item = treewidget.topLevelItem(i)
+            if item.ui.className == "MHrendLayer":
+                layername = item.ui.cb_renderLayer.currentText()
+                usedlayers.append(layername)
+        # make layers unique
+        usedlayers = set(usedlayers)
+        if self.cb_renderLayer.currentText() in usedlayers:
+            renderlayers = set(self.pluginMHfunctions.getRenderLayers())
+            remaininglayers = renderlayers.difference(usedlayers)
+            if len(remaininglayers) > 0:
+                idx = self.cb_renderLayer.findText(list(remaininglayers)[0])
+                if idx != -1:  # If the item is found
+                    self.cb_renderLayer.setCurrentIndex(idx)
+            else:
+                # No layers remaining
+                arelayersremaining = False
+
+            return True, arelayersremaining
+        else:
+            return False, arelayersremaining
+
+    @err_catcher(name=__name__)
     def on_RenderLayerCb_changed(self, index):
-        # print(f"Selected index: {index}")
-        # print(f"Selected item: {self.cb_renderLayer.currentText()}")
+        origname = self.cb_renderLayer.currentText()
+        isused, arelayersremaining = self.is_RenderLayerCb_used()
         self.layerToTask()
-        # self.stateManager.saveStatesToScene
-        
+        if isused:
+            if not origname == self.cb_renderLayer.currentText():
+                message = f"{origname} is already being used by another state"
+                self.core.popup(
+                    message,
+                    title=None,
+                    severity="info",
+                )
+    
+    @err_catcher(name=__name__)
+    def ensureUniqueName(self, names):
+        seen = {}
+        unique_names = []
+
+        for name in names:
+            if name in seen:
+                seen[name] += 1
+                new_name = f"{name}_{seen[name]}"
+                while new_name in seen:
+                    seen[name] += 1
+                    new_name = f"{name}_{seen[name]}"
+                unique_names.append(new_name)
+                seen[new_name] = 0  # Initialize the new name in the seen dictionary
+            else:
+                unique_names.append(name)
+                seen[name] = 0
+
+        return unique_names[0]
+
+    @err_catcher(name=__name__)
+    def createViewLayerDialog(self):
+        from PrismUtils import PrismWidgets
+        self.nameWin = PrismWidgets.CreateItem(
+            startText=self.getTaskname(),
+            showTasks=True,
+            taskType="3d",
+            core=self.core,
+        )
+        self.core.parentWindow(self.nameWin)
+        self.nameWin.setWindowTitle("Create View Layer")
+        self.nameWin.l_item.setText("Layer_Name")
+        self.nameWin.buttonBox.buttons()[0].setText("Ok")
+        # self.nameWin.e_item.selectAll()
+        result = self.nameWin.exec_()
+
+        if result == 1:
+            layerList = self.pluginMHfunctions.getRenderLayers()
+            if self.nameWin.e_item.text() in layerList:
+                self.ensureUniqueName(layerList)
+            self.pluginMHfunctions.createViewLayer(self.nameWin.e_item.text())
+            layers = self.pluginMHfunctions.getRenderLayers()
+            self.cb_renderLayer.addItems(layers)
+            self.on_RenderLayerCb_setup()
+            # self.setup(self.state, self.core, self.stateManager)
+            self.stateManager.saveStatesToScene()
+
+    @err_catcher(name=__name__)
+    def on_RenderLayerCb_setup(self):
+        origname = self.cb_renderLayer.currentText()
+        isused, arelayersremaining = self.is_RenderLayerCb_used()
+        self.layerToTask()
+        if not arelayersremaining:
+            message = f"there are no layers remaining\n Do you want to create a new layer?"
+            result = self.core.popupQuestion(
+                message,
+                title="Create new Layer?",
+            )
+            if result == "Yes":
+                self.createViewLayerDialog()
+            else:
+                self.setTaskname('DELETE THIS STATE')
+                self.gb_passes.setVisible(False)
+                self.gb_outputlayout.setVisible(False)
+                self.gb_output.setVisible(False)
+                self.f_renderLayer.setVisible(False)
+                self.stateManager.saveStatesToScene()
+
+            
     @err_catcher(name=__name__)
     def layerToTask(self):
         layername = self.cb_renderLayer.currentText()
@@ -765,19 +873,22 @@ class MHrendLayerClass(object):
         # layerList = getattr(
         #     self.core.appPlugin, "sm_render_getRenderLayer", lambda x: []
         # )(self)
-
-        self.cb_renderLayer.addItems(layerList)
-
-        if curLayer in layerList:
-            self.cb_renderLayer.setCurrentIndex(layerList.index(curLayer))
+        if 'DELETE THIS STATE' in self.l_taskName.text():
+            self.cb_renderLayer.clear()
+            self.state.setText(0, '!! DELETE THIS STATE !!')
         else:
-            self.cb_renderLayer.setCurrentIndex(0)
-            self.stateManager.saveStatesToScene()
+            self.cb_renderLayer.addItems(layerList)
 
-        self.refreshSubmitUi()
-        getattr(self.pluginMHfunctions, "sm_render_refreshPasses", lambda x: None)(self)
+            if curLayer in layerList:
+                self.cb_renderLayer.setCurrentIndex(layerList.index(curLayer))
+            else:
+                self.cb_renderLayer.setCurrentIndex(0)
+                self.stateManager.saveStatesToScene()
 
-        self.nameChanged(self.e_name.text())
+            self.refreshSubmitUi()
+            getattr(self.pluginMHfunctions, "sm_render_refreshPasses", lambda x: None)(self)
+
+            self.nameChanged(self.e_name.text())
         return True
 
     @err_catcher(name=__name__)

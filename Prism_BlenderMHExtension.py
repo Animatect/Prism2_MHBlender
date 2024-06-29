@@ -41,6 +41,7 @@ class MHBlenderExtension:
         
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
+        # self.core.registerCallback("onStateCreated", self.onStateCreated, plugin=self)
 
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
@@ -71,6 +72,11 @@ class MHBlenderExtension:
     #         if item.checkState(0) == Qt.Checked:
     #             item.ui.sm_toggleLayerNodes(toggle=item.text(0).endswith(" - disabled"))
     ### MonkeyPatch ends.
+    # @err_catcher(name=__name__)
+    # def onStateCreated(self, stateManager, state, *args, **kwargs):
+    #     if state.className == "MHrendLayer":
+    #         if state.markfordeletion:
+    #             stateManager.deleteState(state)
 
     @err_catcher(name=__name__)
     def stateTypeCreator(self, stateName, stateManager):

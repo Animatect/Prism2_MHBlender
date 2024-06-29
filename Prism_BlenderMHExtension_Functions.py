@@ -74,14 +74,20 @@ class Prism_BlenderMHExtension_Functions(object):
 
     @err_catcher(name=__name__)
     def startup(self):
-        print("plugin está en startup.")
+        # print("plugin está en startup.")
+        pass
+        
+    # Create a new view layer
+    @err_catcher(name=__name__)
+    def createViewLayer(self, layername):
+        new_layer_name = layername
+        bpy.context.scene.view_layers.new(name=new_layer_name)
 
     ##############################
     #                            #
     ####### MH REND LAYER ########
     #                            #
     ##############################
-
     @err_catcher(name=__name__)
     def getRenderLayers(self):
         scene = bpy.context.scene
