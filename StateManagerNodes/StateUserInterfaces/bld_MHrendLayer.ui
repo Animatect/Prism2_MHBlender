@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>436</width>
     <height>1484</height>
    </rect>
   </property>
@@ -1403,8 +1403,11 @@
      <property name="title">
       <string>Render Passes</string>
      </property>
+     <property name="flat">
+      <bool>false</bool>
+     </property>
      <property name="checkable">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_5">
       <property name="leftMargin">
@@ -1449,30 +1452,48 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="gb_output">
-     <layout class="QVBoxLayout" name="gb_outputs">
+    <widget class="QGroupBox" name="gb_layerProperties">
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_9">
+      <property name="spacing">
+       <number>6</number>
+      </property>
+      <property name="leftMargin">
+       <number>10</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>10</number>
+      </property>
+      <property name="bottomMargin">
+       <number>2</number>
+      </property>
       <item>
-       <widget class="QGroupBox" name="gb_outputlayout">
+       <widget class="QGroupBox" name="gb_layerpropertiestitle">
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
         <layout class="QHBoxLayout" name="horizontalLayout_7">
-         <property name="leftMargin">
-          <number>50</number>
+         <property name="topMargin">
+          <number>0</number>
          </property>
-         <property name="rightMargin">
-          <number>50</number>
+         <property name="bottomMargin">
+          <number>0</number>
          </property>
          <item>
-          <widget class="QPushButton" name="b_setupLayer">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>50</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Sets up the Layer without assigning an output but creates the nodes, reconnects the outputs etc, this is different to execute in which the output is created.</string>
-           </property>
+          <widget class="QLabel" name="l_layerproperties">
            <property name="text">
-            <string>Setup Layer</string>
+            <string>-- Layer Properties --</string>
+           </property>
+           <property name="textFormat">
+            <enum>Qt::AutoText</enum>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -1480,9 +1501,63 @@
        </widget>
       </item>
       <item>
+       <widget class="QGroupBox" name="gb_properties">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="title">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_11">
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="gb_output">
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>200</height>
+      </size>
+     </property>
+     <layout class="QVBoxLayout" name="gb_outputs">
+      <item>
        <widget class="QGroupBox" name="gb_previous">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>1000000</height>
+         </size>
+        </property>
         <property name="title">
          <string>Previous render</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
         </property>
         <property name="checkable">
          <bool>false</bool>
@@ -1513,8 +1588,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>345</width>
-              <height>249</height>
+              <width>365</width>
+              <height>108</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -1541,6 +1616,72 @@
             <enum>Qt::DownArrow</enum>
            </property>
           </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="gb_donotupdateversion">
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
+        </property>
+        <property name="checkable">
+         <bool>false</bool>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_8">
+         <property name="leftMargin">
+          <number>9</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>9</number>
+         </property>
+         <property name="bottomMargin">
+          <number>9</number>
+         </property>
+         <item>
+          <spacer name="horizontalSpacer_4">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="chb_dontUpdateV">
+           <property name="contextMenuPolicy">
+            <enum>Qt::NoContextMenu</enum>
+           </property>
+           <property name="toolTip">
+            <string>When this is active the path on the nodes won't be updated when submitted to render from a MHRenderState.</string>
+           </property>
+           <property name="text">
+            <string>Don't update Version</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_8">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </widget>

@@ -16,7 +16,7 @@ class Ui_wg_MHrendLayer(object):
     def setupUi(self, wg_MHrendLayer):
         if not wg_MHrendLayer.objectName():
             wg_MHrendLayer.setObjectName(u"wg_MHrendLayer")
-        wg_MHrendLayer.resize(400, 1484)
+        wg_MHrendLayer.resize(436, 1484)
         self.verticalLayout = QVBoxLayout(wg_MHrendLayer)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -711,7 +711,8 @@ class Ui_wg_MHrendLayer(object):
 
         self.gb_passes = QGroupBox(wg_MHrendLayer)
         self.gb_passes.setObjectName(u"gb_passes")
-        self.gb_passes.setCheckable(True)
+        self.gb_passes.setFlat(False)
+        self.gb_passes.setCheckable(False)
         self.verticalLayout_5 = QVBoxLayout(self.gb_passes)
         self.verticalLayout_5.setObjectName(u"verticalLayout_5")
         self.verticalLayout_5.setContentsMargins(9, 9, 9, 9)
@@ -732,26 +733,53 @@ class Ui_wg_MHrendLayer(object):
 
         self.verticalLayout.addWidget(self.gb_passes)
 
+        self.gb_layerProperties = QGroupBox(wg_MHrendLayer)
+        self.gb_layerProperties.setObjectName(u"gb_layerProperties")
+        self.gb_layerProperties.setFlat(False)
+        self.verticalLayout_9 = QVBoxLayout(self.gb_layerProperties)
+        self.verticalLayout_9.setSpacing(6)
+        self.verticalLayout_9.setObjectName(u"verticalLayout_9")
+        self.verticalLayout_9.setContentsMargins(10, 0, 10, 2)
+        self.gb_layerpropertiestitle = QGroupBox(self.gb_layerProperties)
+        self.gb_layerpropertiestitle.setObjectName(u"gb_layerpropertiestitle")
+        self.gb_layerpropertiestitle.setAlignment(Qt.AlignCenter)
+        self.horizontalLayout_7 = QHBoxLayout(self.gb_layerpropertiestitle)
+        self.horizontalLayout_7.setObjectName(u"horizontalLayout_7")
+        self.horizontalLayout_7.setContentsMargins(-1, 0, -1, 0)
+        self.l_layerproperties = QLabel(self.gb_layerpropertiestitle)
+        self.l_layerproperties.setObjectName(u"l_layerproperties")
+        self.l_layerproperties.setTextFormat(Qt.AutoText)
+        self.l_layerproperties.setAlignment(Qt.AlignCenter)
+
+        self.horizontalLayout_7.addWidget(self.l_layerproperties)
+
+
+        self.verticalLayout_9.addWidget(self.gb_layerpropertiestitle)
+
+        self.gb_properties = QGroupBox(self.gb_layerProperties)
+        self.gb_properties.setObjectName(u"gb_properties")
+        self.gb_properties.setEnabled(True)
+        self.gb_properties.setAlignment(Qt.AlignCenter)
+        self.gb_properties.setFlat(False)
+        self.verticalLayout_11 = QVBoxLayout(self.gb_properties)
+        self.verticalLayout_11.setObjectName(u"verticalLayout_11")
+        self.verticalLayout_11.setContentsMargins(10, 0, 10, 0)
+
+        self.verticalLayout_9.addWidget(self.gb_properties)
+
+
+        self.verticalLayout.addWidget(self.gb_layerProperties)
+
         self.gb_output = QGroupBox(wg_MHrendLayer)
         self.gb_output.setObjectName(u"gb_output")
+        self.gb_output.setMaximumSize(QSize(16777215, 200))
         self.gb_outputs = QVBoxLayout(self.gb_output)
         self.gb_outputs.setObjectName(u"gb_outputs")
-        self.gb_outputlayout = QGroupBox(self.gb_output)
-        self.gb_outputlayout.setObjectName(u"gb_outputlayout")
-        self.horizontalLayout_7 = QHBoxLayout(self.gb_outputlayout)
-        self.horizontalLayout_7.setObjectName(u"horizontalLayout_7")
-        self.horizontalLayout_7.setContentsMargins(50, -1, 50, -1)
-        self.b_setupLayer = QPushButton(self.gb_outputlayout)
-        self.b_setupLayer.setObjectName(u"b_setupLayer")
-        self.b_setupLayer.setMinimumSize(QSize(0, 50))
-
-        self.horizontalLayout_7.addWidget(self.b_setupLayer)
-
-
-        self.gb_outputs.addWidget(self.gb_outputlayout)
-
         self.gb_previous = QGroupBox(self.gb_output)
         self.gb_previous.setObjectName(u"gb_previous")
+        self.gb_previous.setMaximumSize(QSize(16777215, 1000000))
+        self.gb_previous.setAlignment(Qt.AlignCenter)
+        self.gb_previous.setFlat(False)
         self.gb_previous.setCheckable(False)
         self.gb_previous.setChecked(False)
         self.horizontalLayout_18 = QHBoxLayout(self.gb_previous)
@@ -762,7 +790,7 @@ class Ui_wg_MHrendLayer(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollAreaWidgetContents = QWidget()
         self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 345, 249))
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 365, 108))
         self.verticalLayout_3 = QVBoxLayout(self.scrollAreaWidgetContents)
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
         self.l_pathLast = QLabel(self.scrollAreaWidgetContents)
@@ -783,6 +811,31 @@ class Ui_wg_MHrendLayer(object):
 
 
         self.gb_outputs.addWidget(self.gb_previous)
+
+        self.gb_donotupdateversion = QGroupBox(self.gb_output)
+        self.gb_donotupdateversion.setObjectName(u"gb_donotupdateversion")
+        self.gb_donotupdateversion.setAlignment(Qt.AlignCenter)
+        self.gb_donotupdateversion.setFlat(False)
+        self.gb_donotupdateversion.setCheckable(False)
+        self.horizontalLayout_8 = QHBoxLayout(self.gb_donotupdateversion)
+        self.horizontalLayout_8.setObjectName(u"horizontalLayout_8")
+        self.horizontalLayout_8.setContentsMargins(9, 0, 9, 9)
+        self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.horizontalLayout_8.addItem(self.horizontalSpacer_4)
+
+        self.chb_dontUpdateV = QCheckBox(self.gb_donotupdateversion)
+        self.chb_dontUpdateV.setObjectName(u"chb_dontUpdateV")
+        self.chb_dontUpdateV.setContextMenuPolicy(Qt.NoContextMenu)
+
+        self.horizontalLayout_8.addWidget(self.chb_dontUpdateV)
+
+        self.horizontalSpacer_8 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.horizontalLayout_8.addItem(self.horizontalSpacer_8)
+
+
+        self.gb_outputs.addWidget(self.gb_donotupdateversion)
 
 
         self.verticalLayout.addWidget(self.gb_output)
@@ -874,12 +927,14 @@ class Ui_wg_MHrendLayer(object):
         self.le_dlGPUdevices.setPlaceholderText(QCoreApplication.translate("wg_MHrendLayer", u"Enter Valid GPU Device Id(s)", None))
         self.gb_passes.setTitle(QCoreApplication.translate("wg_MHrendLayer", u"Render Passes", None))
         self.b_addPasses.setText(QCoreApplication.translate("wg_MHrendLayer", u"Add Passes", None))
-#if QT_CONFIG(tooltip)
-        self.b_setupLayer.setToolTip(QCoreApplication.translate("wg_MHrendLayer", u"Sets up the Layer without assigning an output but creates the nodes, reconnects the outputs etc, this is different to execute in which the output is created.", None))
-#endif // QT_CONFIG(tooltip)
-        self.b_setupLayer.setText(QCoreApplication.translate("wg_MHrendLayer", u"Setup Layer", None))
+        self.l_layerproperties.setText(QCoreApplication.translate("wg_MHrendLayer", u"-- Layer Properties --", None))
+        self.gb_properties.setTitle("")
         self.gb_previous.setTitle(QCoreApplication.translate("wg_MHrendLayer", u"Previous render", None))
         self.l_pathLast.setText(QCoreApplication.translate("wg_MHrendLayer", u"None", None))
         self.b_pathLast.setText(QCoreApplication.translate("wg_MHrendLayer", u"...", None))
+#if QT_CONFIG(tooltip)
+        self.chb_dontUpdateV.setToolTip(QCoreApplication.translate("wg_MHrendLayer", u"When this is active the path on the nodes won't be updated when submitted to render from a MHRenderState.", None))
+#endif // QT_CONFIG(tooltip)
+        self.chb_dontUpdateV.setText(QCoreApplication.translate("wg_MHrendLayer", u"Don't update Version", None))
     # retranslateUi
 

@@ -60,8 +60,9 @@ class MHrendLayerClass(object):
         self.cb_context.addItems(["From scenefile", "Custom"])
         
         self.pluginMHfunctions = self.core.getPlugin("MHBlenderExtension").functions
-        # self.markfordeletion = False
-
+        self.dynamic_checkboxes = []
+        self.layername = ""
+        
         self.curCam = None
         self.renderingStarted = False
         self.cleanOutputdir = True
@@ -130,6 +131,7 @@ class MHrendLayerClass(object):
 
         layers = self.pluginMHfunctions.getRenderLayers()
         self.cb_renderLayer.addItems(layers)
+        self.layername = self.cb_renderLayer.currentText()
 
         self.resolutionPresets = self.core.projects.getResolutionPresets()
         if "Get from rendersettings" not in self.resolutionPresets:
@@ -161,9 +163,46 @@ class MHrendLayerClass(object):
         
         # Connect the toggle event for the whole thing.
         self.stateManager.tw_export.itemChanged.connect(self.sm_toggleLayerNodes)
+        
+        elements = list(self.pluginMHfunctions.layerProperties.keys())
+        self.addPropertyWidget(elements)
+
+        self.updateLayerProperties()
 
         # Check if the layer is selected and change it.
         self.on_RenderLayerCb_setup()
+
+        # Cosmetic tweak to borders.
+        self.handleExtraCSS()
+
+    @err_catcher(name=__name__)
+    def handleExtraCSS(self):
+        ## BORDERS ##
+        # Remove borders
+        self.setStyleSheet("""
+            QGroupBox {
+                border: none;
+            }
+        """)
+        # Apply borders to specific Groupbox
+        self.gb_layerProperties.setStyleSheet("border: 1px solid #3498db;")
+        self.gb_layerpropertiestitle.setStyleSheet("border: none;")
+        self.gb_properties.setStyleSheet("border: none;")
+        self.gb_output.setStyleSheet("border: 1px solid #3498db;")
+        self.gb_previous.setStyleSheet("border: none;")
+        self.gb_donotupdateversion.setStyleSheet("border: none;")
+
+        ## CHECKBOXES ##
+        self.setStyleSheet("""
+            QCheckBox::indicator:checked {
+                background-color: #7dadfa;
+            }
+            QCheckBox::indicator:unchecked {
+                background-color: #3f3f3f;
+            }
+        """)
+        
+
 
     @err_catcher(name=__name__)
     def loadData(self, data):
@@ -272,7 +311,9 @@ class MHrendLayerClass(object):
                 self.state.setCheckState(
                     0, Qt.CheckState(data["stateenabled"]),
                 )
-
+        if "dontupdateversion" in data:
+            self.chb_dontUpdateV.setChecked(eval(data["osupload"]))
+            
         self.core.callback("onStateSettingsLoaded", self, data)
 
     @err_catcher(name=__name__)
@@ -327,12 +368,29 @@ class MHrendLayerClass(object):
         self.le_dlGPUdevices.editingFinished.connect(self.gpuDevicesChanged)
         self.gb_passes.toggled.connect(self.stateManager.saveStatesToScene)
         self.b_addPasses.clicked.connect(self.showPasses)
-        self.b_setupLayer.clicked.connect(self.setupNodes)
         self.lw_passes.customContextMenuRequested.connect(self.rclickPasses)
         self.b_pathLast.clicked.connect(self.showLastPathMenu)
         self.lw_passes.itemDoubleClicked.connect(
             lambda x: self.pluginMHfunctions.sm_render_openPasses(self)
         )
+        self.chb_dontUpdateV.stateChanged.connect(self.isDontUpdateVersionToggled)
+
+    @err_catcher(name=__name__)
+    def isDontUpdateVersionToggled(self, checked):
+        pass
+        # self.stateManager.saveStatesToScene
+        # if checked == Qt.Checked:
+        #     checked = not checked == 0
+        # if not self.state.text(0).endswith(" - disabled"):
+        #     sufix = " - VerNoUpdate"
+        #     name = self.state.text(0)
+        #     if checked:
+        #         name += sufix
+        #     else:
+        #         if self.state.text(0).endswith(sufix):
+        #             name = name.replace(sufix, "")
+            
+        #     self.state.setText(0, name)
 
     @err_catcher(name=__name__)
     def initializeContextBasedSettings(self):
@@ -600,42 +658,54 @@ class MHrendLayerClass(object):
             self.check_items(child_item, usedlayers)
 
     @err_catcher(name=__name__)
-    def is_RenderLayerCb_used(self)->bool:
+    def setRenderLayerCbIndex(self, layername):
+        idx = self.cb_renderLayer.findText(layername)
+        if idx != -1:  # If the item is found
+            self.cb_renderLayer.setCurrentIndex(idx)
+
+    @err_catcher(name=__name__)
+    def is_RenderLayerCb_used(self):#->tuple[bool, set]:
+        # get the picked layer and set the combobox to the original layer to be iterated over
+        chosenname = self.cb_renderLayer.currentText()
+        self.setRenderLayerCbIndex(self.layername)
         treewidget = self.stateManager.tw_export
-        arelayersremaining = True
+        remaininglayers:set = ()
         usedlayers=[]
         for i in range(treewidget.topLevelItemCount()):
             item = treewidget.topLevelItem(i)
             self.check_items(item, usedlayers)
         # make layers unique
         usedlayers = set(usedlayers)
-        if self.cb_renderLayer.currentText() in usedlayers:
+        # If the layer we want to pick has been used, check what layers are remaining to choose from.
+        if chosenname in usedlayers:
             renderlayers = set(self.pluginMHfunctions.getRenderLayers())
             remaininglayers = renderlayers.difference(usedlayers)
-            if len(remaininglayers) > 0:
-                idx = self.cb_renderLayer.findText(list(remaininglayers)[0])
-                if idx != -1:  # If the item is found
-                    self.cb_renderLayer.setCurrentIndex(idx)
-            else:
-                # No layers remaining
-                arelayersremaining = False
-            return True, arelayersremaining
+            # set layer to the layer remaining
+            return True, remaininglayers
         else:
-            return False, arelayersremaining
+            return False, remaininglayers
 
     @err_catcher(name=__name__)
     def on_RenderLayerCb_changed(self, index):
-        origname = self.cb_renderLayer.currentText()
-        isused, arelayersremaining = self.is_RenderLayerCb_used()
+        origname = self.layername
+        chosenname = self.cb_renderLayer.currentText()
+        # if is not the same one
+        if not origname == chosenname:
+            isused, arelayersremaining = self.is_RenderLayerCb_used()
+            #if the layer is used, dont do anything and show a message, else change the layer to the chosen one
+            if isused:
+                    message = f"{chosenname} is already being used by another state"
+                    self.core.popup(
+                        message,
+                        title=None,
+                        severity="info",
+                    )
+            else:
+                self.setRenderLayerCbIndex(chosenname)
+        #set the name of the state and the layername property on the state
         self.layerToTask()
-        if isused:
-            if not origname == self.cb_renderLayer.currentText():
-                message = f"{origname} is already being used by another state"
-                self.core.popup(
-                    message,
-                    title=None,
-                    severity="info",
-                )
+        self.layername = self.cb_renderLayer.currentText()
+        self.stateManager.saveStatesToScene()
     
     @err_catcher(name=__name__)
     def ensureUniqueName(self, names):
@@ -686,24 +756,34 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def on_RenderLayerCb_setup(self):
-        origname = self.cb_renderLayer.currentText()
-        isused, arelayersremaining = self.is_RenderLayerCb_used()
-        self.layerToTask()
-        if not arelayersremaining:
-            message = f"there are no layers remaining\n Do you want to create a new layer?"
-            result = self.core.popupQuestion(
-                message,
-                title="Create new Layer?",
-            )
-            if result == "Yes":
-                self.createViewLayerDialog()
-            else:
-                self.setTaskname('DELETE THIS STATE')
-                self.gb_passes.setVisible(False)
-                self.gb_outputlayout.setVisible(False)
-                self.gb_output.setVisible(False)
-                self.f_renderLayer.setVisible(False)
+        if self.core.status == "loaded":
+            origname = self.layername
+            chosenname = self.cb_renderLayer.currentText()
+            isused, remaininglayers = self.is_RenderLayerCb_used()
+            # if there are layers to pick from
+            if len(remaininglayers) > 0:
+                self.setRenderLayerCbIndex(list(remaininglayers)[0])
+
+                self.layerToTask()
+                self.layername = self.cb_renderLayer.currentText()
                 self.stateManager.saveStatesToScene()
+                        
+            # if there are not, Modify the layer to be unusable (if possible delete it, but Idk how :) )
+            else:
+                message = f"there are no layers remaining\n Do you want to create a new layer?"
+                result = self.core.popupQuestion(
+                    message,
+                    title="Create new Layer?",
+                )
+                if result == "Yes":
+                    self.createViewLayerDialog()
+                else:
+                    self.setTaskname('DELETE THIS STATE')
+                    self.gb_passes.setVisible(False)
+                    self.gb_layerProperties.setVisible(False)
+                    self.gb_output.setVisible(False)
+                    self.f_renderLayer.setVisible(False)
+                    self.stateManager.saveStatesToScene()
 
             
     @err_catcher(name=__name__)
@@ -841,6 +921,45 @@ class MHrendLayerClass(object):
         toggle = self.state.text(0).endswith(" - disabled")
         self.pluginMHfunctions.toggleLayerNodes(self.cb_renderLayer.currentText(), toggle)
 
+    @err_catcher(name=__name__)
+    def addPropertyWidget(self, elements):
+        for element in elements:
+            container = QWidget(self.gb_properties)
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(10)
+
+            label = QLabel(element, container)
+            label.setObjectName(f"label_{element}")
+            layout.addWidget(label)
+
+            checkbox = QCheckBox(container)
+            checkbox.setObjectName(f"checkbox_{element}")
+            checkbox.stateChanged.connect(self.propertyStateChanged)
+            layout.addWidget(checkbox)
+            
+            self.dynamic_checkboxes.append(checkbox)
+            self.verticalLayout_11.addWidget(container)
+
+    @err_catcher(name=__name__)
+    def propertyStateChanged(self, state):
+        checkbox = self.sender()
+        element_name = checkbox.objectName().split("_", 1)[1]
+        if element_name in self.pluginMHfunctions.layerProperties:
+            param = self.pluginMHfunctions.layerProperties[element_name]
+            self.pluginMHfunctions.setViewLayerPropertyState(param, self.cb_renderLayer.currentText(), enable=checkbox.isChecked())
+        # print(f"Checkbox '{element_name}' changed to {'checked' if state == Qt.Checked else 'unchecked'}")
+
+    @err_catcher(name=__name__)
+    def updateLayerProperties(self):
+        for chb in self.dynamic_checkboxes:
+            element_name = chb.objectName().split("_", 1)[1]
+            if element_name in self.pluginMHfunctions.layerProperties:
+                param = self.pluginMHfunctions.layerProperties[element_name]
+                layername = self.cb_renderLayer.currentText()
+                if not layername == "":
+                    ischecked = self.pluginMHfunctions.getViewLayerPropertyState(param, layername)
+                    chb.setChecked(ischecked)
 
     @err_catcher(name=__name__)
     def updateUi(self):
@@ -881,6 +1000,9 @@ class MHrendLayerClass(object):
         # layerList = getattr(
         #     self.core.appPlugin, "sm_render_getRenderLayer", lambda x: []
         # )(self)
+
+        self.updateLayerProperties()
+
         if 'DELETE THIS STATE' in self.l_taskName.text():
             self.cb_renderLayer.clear()
             self.state.setText(0, '!! DELETE THIS STATE !!')
@@ -892,11 +1014,14 @@ class MHrendLayerClass(object):
             else:
                 self.cb_renderLayer.setCurrentIndex(0)
                 self.stateManager.saveStatesToScene()
+            self.layername = self.cb_renderLayer.currentText()
 
             self.refreshSubmitUi()
             getattr(self.pluginMHfunctions, "sm_render_refreshPasses", lambda x: None)(self)
 
-            self.nameChanged(self.e_name.text())
+            self.nameChanged(self.e_name.text())            
+            self.isDontUpdateVersionToggled(self.chb_dontUpdateV.isChecked())
+
         return True
 
     @err_catcher(name=__name__)
@@ -1229,191 +1354,198 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def executeState(self, parent, useVersion="next"):
-        # rangeType = self.cb_rangeType.currentText()
-        # frames = self.getFrameRange(rangeType)
-        # if rangeType != "Expression":
-        #     startFrame = frames[0]
-        #     endFrame = frames[1]
-        # else:
-        #     startFrame = None
-        #     endFrame = None
-
-        # if frames is None or frames == [] or frames[0] is None:
-        #     return [self.state.text(0) + ": error - Framerange is invalid"]
-
-        # if rangeType == "Single Frame":
-        #     endFrame = startFrame
-
-        updateMaster = True
-        fileName = self.core.getCurrentFileName()
-        context = self.getCurrentContext()
-        if not self.renderingStarted:
-            if self.tasknameRequired and not self.getTaskname():
-                return [
-                    self.state.text(0)
-                    + ": error - no identifier is given. Skipped the activation of this state."
-                ]
-
-            # if self.curCam is None or (
-            #     self.curCam != "Current View"
-            #     and not self.core.appPlugin.isNodeValid(self, self.curCam)
-            # ):
-            #     return [
-            #         self.state.text(0)
-            #         + ": error - no camera is selected. Skipping activation of this state."
-            #     ]
-
-            outputName, outputPath, hVersion = self.getOutputName(useVersion=useVersion)
-            expandedOutputPath = os.path.expandvars(outputPath)
-            outLength = len(outputName)
-            if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
-                return [
-                    self.state.text(0)
-                    + " - error - The outputpath is longer than 255 characters (%s), which is not supported on Windows. Please shorten the outputpath by changing the comment, taskname or projectpath."
-                    % outLength
-                ]
-
-            if not os.path.exists(os.path.dirname(expandedOutputPath)):
-                os.makedirs(os.path.dirname(expandedOutputPath))
-
-            details = context.copy()
-            # if "filename" in details:
-            #     del details["filename"]
-
-            # if "extension" in details:
-            #     del details["extension"]
-
-            # details["version"] = hVersion
-            # details["sourceScene"] = fileName
-            # details["identifier"] = self.getTaskname()
-            # details["comment"] = self.stateManager.publishComment
-
-            if self.mediaType == "3drenders":
-                infopath = os.path.dirname(expandedOutputPath)
-            else:
-                infopath = expandedOutputPath
-
-            self.core.saveVersionInfo(
-                filepath=infopath, details=details
-            )
-            
-            self.pluginMHfunctions.setOutputsPaths(self.cb_renderLayer.currentText(), expandedOutputPath)
-
-            self.l_pathLast.setText(outputName)
-            self.l_pathLast.setToolTip(outputName)
-            self.stateManager.saveStatesToScene()
-
-            # rSettings = {
-            #     "outputName": outputName,
-            #     "startFrame": startFrame,
-            #     "endFrame": endFrame,
-            #     "frames": frames,
-            #     "rangeType": rangeType,
-            # }
-
-            # if (
-            #     self.chb_renderPreset.isChecked()
-            #     and "RenderSettings" in self.stateManager.stateTypes
-            # ):
-            #     rSettings["renderSettings"] = getattr(
-            #         self.core.appPlugin,
-            #         "sm_renderSettings_getCurrentSettings",
-            #         lambda x: {},
-            #     )(self)
-            #     self.stateManager.stateTypes["RenderSettings"].applyPreset(
-            #         self.core, self.renderPresets[self.cb_renderPreset.currentText()]
-            #     )
-
-            # self.core.appPlugin.sm_render_preSubmit(self, rSettings)
-
-            # kwargs = {
-            #     "state": self,
-            #     "scenefile": fileName,
-            #     "settings": rSettings,
-            # }
-
-            # result = self.core.callback("preRender", **kwargs)
-            # for res in result:
-            #     if isinstance(res, dict) and res.get("cancel", False):
-            #         return [
-            #             self.state.text(0)
-            #             + " - error - %s" % res.get("details", "preRender hook returned False")
-            #         ]
-            result = "Result=Success"
-            # if not os.path.exists(os.path.expandvars(os.path.dirname(rSettings["outputName"]))):
-            #     os.makedirs(os.path.expandvars(os.path.dirname(rSettings["outputName"])))
-
-            # if self.stateManager.actionSaveDuringPub.isChecked():
-            #     self.core.saveScene(versionUp=False, prismReq=False)
-
-            # if self.core.getConfig("globals", "backupScenesOnPublish", config="project"):
-            #     self.core.entities.backupScenefile(os.path.expandvars(os.path.dirname(rSettings["outputName"])), bufferMinutes=0)
-
-            # if not self.gb_submit.isHidden() and self.gb_submit.isChecked():
-            #     handleMaster = "media" if self.isUsingMasterVersion() else False
-            #     plugin = self.core.plugins.getRenderfarmPlugin(self.cb_manager.currentText())
-            #     if hasattr(self, "chb_redshift") and self.chb_redshift.isChecked() and not self.w_redshift.isHidden():
-            #         sceneDescription = "redshift"
-            #     else:
-            #         sceneDescription = None
-
-            #     result = plugin.sm_render_submitJob(
-            #         self,
-            #         rSettings["outputName"],
-            #         parent,
-            #         handleMaster=handleMaster,
-            #         details=details,
-            #         sceneDescription=sceneDescription
-            #     )
-            #     updateMaster = False
+        willexecute = True
+        #if dont update version is checked and there is a path already.
+        # if self.chb_dontUpdateV.isChecked() and self.l_pathLast.text() != "":
+        #     willexecute = False
+        
+        if willexecute:
+            # rangeType = self.cb_rangeType.currentText()
+            # frames = self.getFrameRange(rangeType)
+            # if rangeType != "Expression":
+            #     startFrame = frames[0]
+            #     endFrame = frames[1]
             # else:
+            #     startFrame = None
+            #     endFrame = None
+
+            # if frames is None or frames == [] or frames[0] is None:
+            #     return [self.state.text(0) + ": error - Framerange is invalid"]
+
+            # if rangeType == "Single Frame":
+            #     endFrame = startFrame
+
+            updateMaster = True
+            fileName = self.core.getCurrentFileName()
+            context = self.getCurrentContext()
+            if not self.renderingStarted:
+                if self.tasknameRequired and not self.getTaskname():
+                    return [
+                        self.state.text(0)
+                        + ": error - no identifier is given. Skipped the activation of this state."
+                    ]
+
+                # if self.curCam is None or (
+                #     self.curCam != "Current View"
+                #     and not self.core.appPlugin.isNodeValid(self, self.curCam)
+                # ):
+                #     return [
+                #         self.state.text(0)
+                #         + ": error - no camera is selected. Skipping activation of this state."
+                #     ]
+        
+                outputName, outputPath, hVersion = self.getOutputName(useVersion=useVersion)
+                print("outputName: ", outputName, "outputPath: ",outputPath, "hVersion: ", hVersion)
+                expandedOutputPath = os.path.expandvars(outputPath)
+                outLength = len(outputName)
+                if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
+                    return [
+                        self.state.text(0)
+                        + " - error - The outputpath is longer than 255 characters (%s), which is not supported on Windows. Please shorten the outputpath by changing the comment, taskname or projectpath."
+                        % outLength
+                    ]
+
+                if not os.path.exists(os.path.dirname(expandedOutputPath)):
+                    os.makedirs(os.path.dirname(expandedOutputPath))
+
+                details = context.copy()
+                # if "filename" in details:
+                #     del details["filename"]
+
+                # if "extension" in details:
+                #     del details["extension"]
+
+                # details["version"] = hVersion
+                # details["sourceScene"] = fileName
+                # details["identifier"] = self.getTaskname()
+                # details["comment"] = self.stateManager.publishComment
+
+                if self.mediaType == "3drenders":
+                    infopath = os.path.dirname(expandedOutputPath)
+                else:
+                    infopath = expandedOutputPath
+
+                self.core.saveVersionInfo(
+                    filepath=infopath, details=details
+                )
+                
+                self.pluginMHfunctions.setOutputsPaths(self.cb_renderLayer.currentText(), expandedOutputPath)
+
+                self.l_pathLast.setText(outputName)
+                self.l_pathLast.setToolTip(outputName)
+                self.stateManager.saveStatesToScene()
+
+                # rSettings = {
+                #     "outputName": outputName,
+                #     "startFrame": startFrame,
+                #     "endFrame": endFrame,
+                #     "frames": frames,
+                #     "rangeType": rangeType,
+                # }
+
+                # if (
+                #     self.chb_renderPreset.isChecked()
+                #     and "RenderSettings" in self.stateManager.stateTypes
+                # ):
+                #     rSettings["renderSettings"] = getattr(
+                #         self.core.appPlugin,
+                #         "sm_renderSettings_getCurrentSettings",
+                #         lambda x: {},
+                #     )(self)
+                #     self.stateManager.stateTypes["RenderSettings"].applyPreset(
+                #         self.core, self.renderPresets[self.cb_renderPreset.currentText()]
+                #     )
+
+                # self.core.appPlugin.sm_render_preSubmit(self, rSettings)
+
+                # kwargs = {
+                #     "state": self,
+                #     "scenefile": fileName,
+                #     "settings": rSettings,
+                # }
+
+                # result = self.core.callback("preRender", **kwargs)
+                # for res in result:
+                #     if isinstance(res, dict) and res.get("cancel", False):
+                #         return [
+                #             self.state.text(0)
+                #             + " - error - %s" % res.get("details", "preRender hook returned False")
+                #         ]
+                result = "Result=Success"
+                # if not os.path.exists(os.path.expandvars(os.path.dirname(rSettings["outputName"]))):
+                #     os.makedirs(os.path.expandvars(os.path.dirname(rSettings["outputName"])))
+
+                # if self.stateManager.actionSaveDuringPub.isChecked():
+                #     self.core.saveScene(versionUp=False, prismReq=False)
+
+                # if self.core.getConfig("globals", "backupScenesOnPublish", config="project"):
+                #     self.core.entities.backupScenefile(os.path.expandvars(os.path.dirname(rSettings["outputName"])), bufferMinutes=0)
+
+                # if not self.gb_submit.isHidden() and self.gb_submit.isChecked():
+                #     handleMaster = "media" if self.isUsingMasterVersion() else False
+                #     plugin = self.core.plugins.getRenderfarmPlugin(self.cb_manager.currentText())
+                #     if hasattr(self, "chb_redshift") and self.chb_redshift.isChecked() and not self.w_redshift.isHidden():
+                #         sceneDescription = "redshift"
+                #     else:
+                #         sceneDescription = None
+
+                #     result = plugin.sm_render_submitJob(
+                #         self,
+                #         rSettings["outputName"],
+                #         parent,
+                #         handleMaster=handleMaster,
+                #         details=details,
+                #         sceneDescription=sceneDescription
+                #     )
+                #     updateMaster = False
+                # else:
+                #     result = self.core.appPlugin.sm_render_startLocalRender(
+                #         self, rSettings["outputName"], rSettings
+                #     )
+            # else:
+            #     rSettings = self.LastRSettings
             #     result = self.core.appPlugin.sm_render_startLocalRender(
             #         self, rSettings["outputName"], rSettings
             #     )
-        # else:
-        #     rSettings = self.LastRSettings
-        #     result = self.core.appPlugin.sm_render_startLocalRender(
-        #         self, rSettings["outputName"], rSettings
-        #     )
-        #     outputName = rSettings["outputName"]
-        else:
-            result = "Result=Success"
-        # if not self.renderingStarted:
-        #     self.core.appPlugin.sm_render_undoRenderSettings(self, rSettings)
-
-        if result == "publish paused":
-            return [self.state.text(0) + " - publish paused"]
-        else:
-            if updateMaster:
-                self.handleMasterVersion(os.path.expandvars(outputName))
-
-        #     kwargs = {
-        #         "state": self,
-        #         "scenefile": fileName,
-        #         "settings": rSettings,
-        #         "result": result,
-        #     }
-
-        #     self.core.callback("postRender", **kwargs)
-
-            if "Result=Success" in result:
-                return [self.state.text(0) + " - success"]
+            #     outputName = rSettings["outputName"]
             else:
-                erStr = "%s ERROR - sm_default_imageRenderPublish %s:\n%s" % (
-                    time.strftime("%d/%m/%y %X"),
-                    self.core.version,
-                    result,
-                )
-                if not result.startswith("Execute Canceled: "):
-                    if result == "unknown error (files do not exist)":
-                        QMessageBox.warning(
-                            self.core.messageParent,
-                            "Warning",
-                            "No files were created during the rendering. If you think this is a Prism bug please report it in the forum:\nwww.prism-pipeline.com/forum/\nor write a mail to contact@prism-pipeline.com",
-                        )
-                    else:
-                        self.core.writeErrorLog(erStr)
-                return [self.state.text(0) + " - error - " + result]
+                result = "Result=Success"
+            # if not self.renderingStarted:
+            #     self.core.appPlugin.sm_render_undoRenderSettings(self, rSettings)
+
+            if result == "publish paused":
+                return [self.state.text(0) + " - publish paused"]
+            else:
+                if updateMaster:
+                    self.handleMasterVersion(os.path.expandvars(outputName))
+
+            #     kwargs = {
+            #         "state": self,
+            #         "scenefile": fileName,
+            #         "settings": rSettings,
+            #         "result": result,
+            #     }
+
+            #     self.core.callback("postRender", **kwargs)
+
+                if "Result=Success" in result:
+                    return [self.state.text(0) + " - success"]
+                else:
+                    erStr = "%s ERROR - sm_default_imageRenderPublish %s:\n%s" % (
+                        time.strftime("%d/%m/%y %X"),
+                        self.core.version,
+                        result,
+                    )
+                    if not result.startswith("Execute Canceled: "):
+                        if result == "unknown error (files do not exist)":
+                            QMessageBox.warning(
+                                self.core.messageParent,
+                                "Warning",
+                                "No files were created during the rendering. If you think this is a Prism bug please report it in the forum:\nwww.prism-pipeline.com/forum/\nor write a mail to contact@prism-pipeline.com",
+                            )
+                        else:
+                            self.core.writeErrorLog(erStr)
+                    return [self.state.text(0) + " - error - " + result]
 
     @err_catcher(name=__name__)
     def isUsingMasterVersion(self):
@@ -1495,6 +1627,7 @@ class MHrendLayerClass(object):
             "lastexportpath": self.l_pathLast.text().replace("\\", "/"),
             "enablepasses": str(self.gb_passes.isChecked()),
             "stateenabled": self.core.getCheckStateValue(self.state.checkState(0)),
+            "dontupdateversion":str(self.chb_dontUpdateV.isChecked()),
         }
         self.core.callback("onStateGetSettings", self, stateProps)
         return stateProps

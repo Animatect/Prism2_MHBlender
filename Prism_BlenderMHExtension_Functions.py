@@ -66,9 +66,25 @@ class Prism_BlenderMHExtension_Functions(object):
 "transparent":"Transp",
 
 })
-        
+        self.layerProperties = {
+            "Environment":"use_sky",
+            "Surfaces":"use_solid",
+            "Curves":"use_strand",
+            "Volumes":"use_volumes",
+            "Motion Blur":"use_motion_blur",
+            "Denoising":"cycles.use_denoising",
+        }
+
         self.core.registerCallback("onStateDeleted", self.onStateDeleted, plugin=self)
-        
+    
+    @err_catcher(name=__name__)
+    def isUsingCycles(self)->bool:
+        return bpy.context.scene.render.engine == 'CYCLES'
+    @err_catcher(name=__name__)
+    def isUsingEevee(self)->bool:
+        return bpy.context.scene.render.engine == 'BLENDER_EEVEE'
+
+
     @err_catcher(name=__name__)
     def lowercaseAOVdict(self, original_dict:dict)->dict:
         lowercase_dict = {key.lower(): value for key, value in original_dict.items()}
@@ -190,11 +206,11 @@ class Prism_BlenderMHExtension_Functions(object):
         curlayer = scene.view_layers[layername]
         aovParms = [x for x in dir(curlayer) if x.startswith("use_pass_")]
         # AOVs inside the cycles list
-        if bpy.context.scene.render.engine == 'CYCLES':
+        if self.isUsingCycles():
             aovParms += [
                 "cycles." + x for x in dir(curlayer.cycles) if x.startswith("use_pass_")
             ]
-        elif bpy.context.scene.render.engine == 'BLENDER_EEVEE':
+        elif self.isUsingEevee():
             aovParms += [
                 "eevee." + x for x in dir(curlayer.eevee) if x.startswith("use_pass_")
             ]
@@ -364,6 +380,30 @@ class Prism_BlenderMHExtension_Functions(object):
             obj = getattr(obj, a)
 
         setattr(obj, attrs[-1], enable)
+
+    @err_catcher(name=__name__)
+    def setViewLayerPropertyState(self, parameter, layername, enable)->None:
+        scene = bpy.context.scene
+        curlayer = scene.view_layers[layername]
+        attrs = parameter.split(".")
+        obj = curlayer
+        for a in attrs[:-1]:
+            #obj = getattr(obj, 'cycles')
+            obj = getattr(obj, a)
+        setattr(obj, attrs[-1], enable)
+
+    @err_catcher(name=__name__)
+    def getViewLayerPropertyState(self, parameter, layername)->bool:
+        scene = bpy.context.scene
+        curlayer = scene.view_layers[layername]
+        attrs = parameter.split(".")
+        obj = curlayer
+        for a in attrs[:-1]:
+            #obj = getattr(obj, 'cycles')
+            obj = getattr(obj, a)
+        ischecked = getattr(obj, attrs[-1])
+        return ischecked
+
 
     ######################################
     #                                    #
