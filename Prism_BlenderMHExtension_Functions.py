@@ -583,6 +583,10 @@ class Prism_BlenderMHExtension_Functions(object):
                 if out_node:
                     out_node.mute = toggle
             rendernode.mute = toggle
+
+        if layername in self.getRenderLayers():
+            bpy.context.scene.view_layers[layername].use = not toggle
+
     
     ##################################
 
@@ -642,7 +646,8 @@ class Prism_BlenderMHExtension_Functions(object):
         for key, value in layernodesdict.items():
             node = value
             if node and node.type == 'OUTPUT_FILE':
-                allpath = os.path.normpath(basepath + "\\")
+                # Remove the AOV beauty from the base path
+                allpath = os.path.dirname(os.path.normpath(basepath + "\\"))
                 if key == 'crypto':
                     allpath = os.path.normpath(os.path.join(allpath, layername + "_CryptoMatte"))
 

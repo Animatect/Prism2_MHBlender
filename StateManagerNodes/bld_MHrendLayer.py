@@ -1434,9 +1434,12 @@ class MHrendLayerClass(object):
                 )
                 
                 self.pluginMHfunctions.setOutputsPaths(self.cb_renderLayer.currentText(), expandedOutputPath)
+                
+                # the aov is necesary for prism logic, we have to remove it fo some of our operations.
+                outputpathnoaov = os.path.join(os.path.dirname(expandedOutputPath),os.path.basename(outputName))
 
-                self.l_pathLast.setText(outputName)
-                self.l_pathLast.setToolTip(outputName)
+                self.l_pathLast.setText(outputpathnoaov)
+                self.l_pathLast.setToolTip(outputpathnoaov)
                 self.stateManager.saveStatesToScene()
 
                 # rSettings = {
