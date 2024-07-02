@@ -44,8 +44,6 @@ class MHBlenderExtension:
                 self.monkeypatchedsm = origin
                 #
                 self.core.plugins.monkeyPatch(origin.rclTree, self.rclTree, self, force=True)
-                self.core.plugins.monkeyPatch(self.core.mediaProducts.getMediaVersionInfoPathFromFilepath, self.getMediaVersionInfoPathFromFilepath, self, force=True)
-                self.core.plugins.monkeyPatch(self.core.mediaProducts.getRenderProductDataFromFilepath, self.getRenderProductDataFromFilepath, self, force=True)
                 #
                 self.stateTypeCreator(customstate, origin)
                 
@@ -108,67 +106,6 @@ class %s(QWidget, %s.%s, %s.%sClass):
     #        	 MONKEYPATCHED FUNCTIONS           #
     #                                              #
     ################################################
-    @err_catcher(name=__name__)
-    def getMediaVersionInfoPathFromFilepath(self, path, mediaType=None):
-        if self.isMHrendClass:
-            print(":: monkeypatched getMediaVersionInfoPathFromFilepath ::")
-            if mediaType == "playblasts":
-                return self.getPlayblastVersionInfoPathFromFilepath(path)
-            elif mediaType == "2drenders":
-                return self.get2dVersionInfoPathFromFilepath(path)
-
-            infoPath = os.path.join(
-                # THIS IS THE PART WE PATCH, It should only go back one directory, not 2.
-                os.path.dirname(path),
-                "versioninfo" + self.core.configs.getProjectExtension(),
-            )
-            return infoPath
-        else:
-            # Call original function
-            return self.core.plugins.callUnpatchedFunction(self.core.mediaProducts.getMediaVersionInfoPathFromFilepath, path, mediaType)
-    
-    @err_catcher(name=__name__)
-    def getRenderProductDataFromFilepath(self, filepath, mediaType="3drenders"):
-        if self.isMHrendClass:
-            print(":: monkeypatched getRenderProductDataFromFilepath ::")
-            entityType = self.core.paths.getEntityTypeFromPath(filepath)
-            if entityType == "asset":
-                key = "renderFilesAssets"
-            elif entityType == "shot":
-                key = "renderFilesShots"
-            else:
-                return {}
-
-            context = {"type": entityType}
-            context["mediaType"] = mediaType
-            location = self.core.mediaProducts.getLocationFromPath(filepath)
-            if location:
-                context["project_path"] = self.core.paths.getRenderProductBasePaths()[location]
-
-            template = self.core.projects.getResolvedProjectStructurePath(key, context=context)
-            # THIS IS THE PART WE PATCH, it should have no aov part in the template.
-            template = template.replace("@aov@", "")
-            context = {"entityType": entityType, "project_path": context["project_path"]}
-            data = self.core.projects.extractKeysFromPath(filepath, template, context=context)
-            if not data:
-                if entityType == "asset":
-                    key = "playblastFilesAssets"
-                elif entityType == "shot":
-                    key = "playblastFilesShots"
-
-                context = {"entityType": entityType, "project_path": context["project_path"]}
-                template = self.core.projects.getResolvedProjectStructurePath(key, context=context)
-                context = {"entityType": entityType, "project_path": context["project_path"]}
-                data = self.core.projects.extractKeysFromPath(filepath, template, context=context)
-
-            data["type"] = entityType
-            if "asset_path" in data:
-                data["asset"] = os.path.basename(data["asset_path"])
-
-            return data
-        else:
-            # Call original function
-            return self.core.plugins.callUnpatchedFunction(self.core.mediaProducts.getRenderProductDataFromFilepath, filepath, mediaType)
     
     #Right click menu from nodes on state manager to get previous versions.
     @err_catcher(name=__name__)

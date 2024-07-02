@@ -1324,7 +1324,6 @@ class MHrendLayerClass(object):
             return
 
         task = self.getTaskname()
-        # print("el taskname es: ", task)
         extension = self.cb_format.currentText()
         context = self.getCurrentContext()
         framePadding = ""
@@ -1342,7 +1341,6 @@ class MHrendLayerClass(object):
             comment=self.stateManager.publishComment,
             version=useVersion if useVersion != "next" else None,
             location=location,
-            aov='',
             singleFrame=singleFrame,
             returnDetails=True,
             mediaType=self.mediaType,
@@ -1408,11 +1406,11 @@ class MHrendLayerClass(object):
                         % outLength
                     ]
 
-                # if not os.path.exists(os.path.dirname(expandedOutputPath)):
-                #     os.makedirs(os.path.dirname(expandedOutputPath))
+                if not os.path.exists(os.path.dirname(expandedOutputPath)):
+                    os.makedirs(os.path.dirname(expandedOutputPath))
                 
-                if not os.path.exists(expandedOutputPath):
-                    os.makedirs(expandedOutputPath)
+                # if not os.path.exists(expandedOutputPath):
+                #     os.makedirs(expandedOutputPath)
 
                 details = context.copy()
                 if "filename" in details:
@@ -1426,10 +1424,10 @@ class MHrendLayerClass(object):
                 details["identifier"] = self.getTaskname()
                 details["comment"] = self.stateManager.publishComment
 
-                # if self.mediaType == "3drenders":
-                #     infopath = os.path.dirname(expandedOutputPath)
-                # else:
-                infopath = expandedOutputPath
+                if self.mediaType == "3drenders":
+                    infopath = os.path.dirname(expandedOutputPath)
+                else:
+                    infopath = expandedOutputPath
 
                 self.core.saveVersionInfo(
                     filepath=infopath, details=details
