@@ -92,7 +92,6 @@ class Prism_BlenderMHExtension_Functions(object):
 
     @err_catcher(name=__name__)
     def startup(self):
-        # print("plugin está en startup.")
         pass
         
     # Create a new view layer
@@ -266,8 +265,6 @@ class Prism_BlenderMHExtension_Functions(object):
         nodes:list = self.getPatternedLayerNodes('Prism_RL_')
         if len(nodes) > 0:
             sorted_nodes:list = self.sortNodesByYposition(nodes)
-            for n in sorted_nodes:
-                print(n.name, ": ", n.location)
             y_offset:float = 0
             current_y:float = sorted_nodes[0].location.y
             current_x:float = sorted_nodes[0].location.x
@@ -326,11 +323,8 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def removeAOVSlot(self, layernodes:dict, nodetype:str, slotname:str)->None:
         if layernodes[nodetype]:
-            print("nodetype: ", nodetype, ", slotname: ", slotname)
             inputs = layernodes[nodetype].inputs
-            print("inputs:" ,inputs)
             if slotname in inputs:
-                print(f'{slotname} in inputs')
                 inputs.remove(inputs[slotname])
 
     @err_catcher(name=__name__)

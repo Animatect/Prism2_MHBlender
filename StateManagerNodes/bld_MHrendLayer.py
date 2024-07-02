@@ -435,6 +435,7 @@ class MHrendLayerClass(object):
         menu.addAction(act_open)
 
         act_open = QAction("Open in explorer", self)
+        print("open in explorer path: ",path)
         act_open.triggered.connect(lambda: self.core.openFolder(path))
         menu.addAction(act_open)
 
@@ -1323,6 +1324,7 @@ class MHrendLayerClass(object):
             return
 
         task = self.getTaskname()
+        # print("el taskname es: ", task)
         extension = self.cb_format.currentText()
         context = self.getCurrentContext()
         framePadding = ""
@@ -1397,6 +1399,7 @@ class MHrendLayerClass(object):
                 outputName, outputPath, hVersion = self.getOutputName(useVersion=useVersion)
                 print("outputName: ", outputName, "outputPath: ",outputPath, "hVersion: ", hVersion)
                 expandedOutputPath = os.path.expandvars(outputPath)
+                print("expanded output path: ", expandedOutputPath)
                 outLength = len(outputName)
                 if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
                     return [
@@ -1405,25 +1408,28 @@ class MHrendLayerClass(object):
                         % outLength
                     ]
 
-                if not os.path.exists(os.path.dirname(expandedOutputPath)):
-                    os.makedirs(os.path.dirname(expandedOutputPath))
+                # if not os.path.exists(os.path.dirname(expandedOutputPath)):
+                #     os.makedirs(os.path.dirname(expandedOutputPath))
+                
+                if not os.path.exists(expandedOutputPath):
+                    os.makedirs(expandedOutputPath)
 
                 details = context.copy()
-                # if "filename" in details:
-                #     del details["filename"]
+                if "filename" in details:
+                    del details["filename"]
 
-                # if "extension" in details:
-                #     del details["extension"]
+                if "extension" in details:
+                    del details["extension"]
 
-                # details["version"] = hVersion
-                # details["sourceScene"] = fileName
-                # details["identifier"] = self.getTaskname()
-                # details["comment"] = self.stateManager.publishComment
+                details["version"] = hVersion
+                details["sourceScene"] = fileName
+                details["identifier"] = self.getTaskname()
+                details["comment"] = self.stateManager.publishComment
 
-                if self.mediaType == "3drenders":
-                    infopath = os.path.dirname(expandedOutputPath)
-                else:
-                    infopath = expandedOutputPath
+                # if self.mediaType == "3drenders":
+                #     infopath = os.path.dirname(expandedOutputPath)
+                # else:
+                infopath = expandedOutputPath
 
                 self.core.saveVersionInfo(
                     filepath=infopath, details=details
