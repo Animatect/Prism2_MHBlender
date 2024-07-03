@@ -1213,10 +1213,29 @@ class MHrendLayerClass(object):
         self.il.tw_steps.horizontalHeaderItem(0).setText("Name")
         self.il.tw_steps.setColumnHidden(1, True)
         self.il.buttonBox.button(QDialogButtonBox.Ok).setEnabled(True)
+        tech = []
+        main = []
+        crypto = []
         for i in sorted(steps, key=lambda s: s.lower()):
+            passname:str = self.pluginMHfunctions.AOVDict[i.lower()]
+            if self.pluginMHfunctions.compareTechPass(passname):
+                tech.append(i)
+            elif 'crypto' in passname.lower():
+                crypto.append(i)
+            else:
+                main.append(i)
+        organizedsteps = tech + main + crypto
+        for i in organizedsteps:
             rc = self.il.tw_steps.rowCount()
             self.il.tw_steps.insertRow(rc)
-            item1 = QTableWidgetItem(i)
+            item1 = QTableWidgetItem(i)            
+            passname:str = self.pluginMHfunctions.AOVDict[i.lower()]
+            if i in tech:
+                item1.setBackground(QColor("#995233"))
+            elif i in crypto:
+                item1.setBackground(QColor("#429933"))
+            else:
+                item1.setBackground(QColor("#365e99"))
             self.il.tw_steps.setItem(rc, 0, item1)
 
         result = self.il.exec_()
