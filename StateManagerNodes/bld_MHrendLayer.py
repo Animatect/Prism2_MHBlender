@@ -668,18 +668,20 @@ class MHrendLayerClass(object):
     def is_RenderLayerCb_used(self):#->tuple[bool, set]:
         # get the picked layer and set the combobox to the original layer to be iterated over
         chosenname = self.cb_renderLayer.currentText()
+        blenderrenderlayers:list = self.pluginMHfunctions.getRenderLayers()
         self.setRenderLayerCbIndex(self.layername)
         treewidget = self.stateManager.tw_export
-        remaininglayers:set = ()
+        remaininglayers:set = set(blenderrenderlayers)
         usedlayers=[]
         for i in range(treewidget.topLevelItemCount()):
             item = treewidget.topLevelItem(i)
             self.check_items(item, usedlayers)
         # make layers unique
         usedlayers = set(usedlayers)
+        print("usedlayers: ", usedlayers)
         # If the layer we want to pick has been used, check what layers are remaining to choose from.
         if chosenname in usedlayers:
-            renderlayers = set(self.pluginMHfunctions.getRenderLayers())
+            renderlayers = set(blenderrenderlayers)
             remaininglayers = renderlayers.difference(usedlayers)
             # set layer to the layer remaining
             return True, remaininglayers
@@ -741,6 +743,7 @@ class MHrendLayerClass(object):
         self.nameWin.setWindowTitle("Create View Layer")
         self.nameWin.l_item.setText("Layer_Name")
         self.nameWin.buttonBox.buttons()[0].setText("Ok")
+        self.nameWin.buttonBox.buttons()[1].setVisible(False)
         # self.nameWin.e_item.selectAll()
         result = self.nameWin.exec_()
 

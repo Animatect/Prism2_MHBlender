@@ -121,7 +121,6 @@ class %s(QWidget, %s.%s, %s.%sClass):
                 # other monkeypatched functions that the modified version should be used.
                 self.isMHrendClass = parentState.ui.className in renderclasses
                 if self.isMHrendClass:
-                    print("se usa patched")
                     rcmenu = QMenu(sm)
                     sm.rClickedItem = parentState
 
