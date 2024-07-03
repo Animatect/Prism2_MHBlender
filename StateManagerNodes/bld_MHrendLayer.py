@@ -1460,8 +1460,9 @@ class MHrendLayerClass(object):
                     if rlayername in layers:
                         outnodesdict:dict = self.pluginMHfunctions.getLayerOutNodes(rlayername)
                         for node in list(outnodesdict.values()):
-                            if not os.path.dirname(expandedOutputPath) in node.base_path:
-                                pathassigned = False
+                            if node:
+                                if not os.path.dirname(expandedOutputPath) in node.base_path:
+                                    pathassigned = False
 
                     if pathassigned:
                         result = "Result=Success"
