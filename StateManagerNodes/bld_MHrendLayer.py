@@ -109,6 +109,7 @@ class MHrendLayerClass(object):
         self.gb_submit.setChecked(False)
         self.gb_submit.setVisible(False)
         self.f_renderLayer.setVisible(True)
+        self.chb_dontUpdateV.setChecked(False)
 
         getattr(self.core.appPlugin, "sm_render_startup", lambda x: None)(self)
 
@@ -312,7 +313,7 @@ class MHrendLayerClass(object):
                     0, Qt.CheckState(data["stateenabled"]),
                 )
         if "dontupdateversion" in data:
-            self.chb_dontUpdateV.setChecked(eval(data["osupload"]))
+            self.chb_dontUpdateV.setChecked(eval(data["dontupdateversion"]))
             
         self.core.callback("onStateSettingsLoaded", self, data)
 
@@ -377,20 +378,19 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def isDontUpdateVersionToggled(self, checked):
-        pass
-        # self.stateManager.saveStatesToScene
-        # if checked == Qt.Checked:
-        #     checked = not checked == 0
-        # if not self.state.text(0).endswith(" - disabled"):
-        #     sufix = " - VerNoUpdate"
-        #     name = self.state.text(0)
-        #     if checked:
-        #         name += sufix
-        #     else:
-        #         if self.state.text(0).endswith(sufix):
-        #             name = name.replace(sufix, "")
+        if checked == Qt.Checked:
+            checked = not checked == 0
+        if not self.state.text(0).endswith(" - disabled"):
+            sufix = " - VerNoUpdate"
+            name = self.state.text(0)
+            if checked:
+                name += sufix
+            else:
+                if self.state.text(0).endswith(sufix):
+                    name = name.replace(sufix, "")
             
-        #     self.state.setText(0, name)
+            self.state.setText(0, name)
+        self.stateManager.saveStatesToScene
 
     @err_catcher(name=__name__)
     def initializeContextBasedSettings(self):
@@ -1356,206 +1356,131 @@ class MHrendLayerClass(object):
         return outputPathData["path"], outputFolder, hVersion
 
     @err_catcher(name=__name__)
-    def executeState(self, parent, useVersion="next"):
+    def executeState(self, parent, useVersion="next", calledFromMHRender=False)->None:
         willexecute = True
-        #if dont update version is checked and there is a path already.
-        # if self.chb_dontUpdateV.isChecked() and self.l_pathLast.text() != "":
-        #     willexecute = False
-        
-        if willexecute:
-            # rangeType = self.cb_rangeType.currentText()
-            # frames = self.getFrameRange(rangeType)
-            # if rangeType != "Expression":
-            #     startFrame = frames[0]
-            #     endFrame = frames[1]
-            # else:
-            #     startFrame = None
-            #     endFrame = None
+        layerhasoutnodes = False
+        result = "Result=Success"
+        # check if there are nodes asociated to this layer.
+        rlayername = self.cb_renderLayer.currentText()
+        layers = self.pluginMHfunctions.getRenderLayers()
+        if rlayername in layers:
+            outnodesdict:dict = self.pluginMHfunctions.getLayerOutNodes(rlayername)
+            for v in list(outnodesdict.values()):
+                if v:
+                    layerhasoutnodes = True
+                    break
+        if layerhasoutnodes:
+            # if dont update version is checked and there is a path already.
+            print("l_pathLast.text(): ", self.l_pathLast.text())
+            if self.chb_dontUpdateV.isChecked() and self.l_pathLast.text() != None:
+                willexecute = False
+            
+            if willexecute:
 
-            # if frames is None or frames == [] or frames[0] is None:
-            #     return [self.state.text(0) + ": error - Framerange is invalid"]
+                updateMaster = True
+                fileName = self.core.getCurrentFileName()
+                context = self.getCurrentContext()
+                if not self.renderingStarted:
+                    if self.tasknameRequired and not self.getTaskname():
+                        return [
+                            self.state.text(0)
+                            + ": error - no identifier is given. Skipped the activation of this state."
+                        ]
+            
+                    outputName, outputPath, hVersion = self.getOutputName(useVersion=useVersion)
+                    print("outputName: ", outputName, "outputPath: ",outputPath, "hVersion: ", hVersion)
+                    expandedOutputPath = os.path.expandvars(outputPath)
+                    print("expanded output path: ", expandedOutputPath)
+                    outLength = len(outputName)
+                    if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
+                        return [
+                            self.state.text(0)
+                            + " - error - The outputpath is longer than 255 characters (%s), which is not supported on Windows. Please shorten the outputpath by changing the comment, taskname or projectpath."
+                            % outLength
+                        ]
 
-            # if rangeType == "Single Frame":
-            #     endFrame = startFrame
+                    if not os.path.exists(os.path.dirname(expandedOutputPath)):
+                        os.makedirs(os.path.dirname(expandedOutputPath))
 
-            updateMaster = True
-            fileName = self.core.getCurrentFileName()
-            context = self.getCurrentContext()
-            if not self.renderingStarted:
-                if self.tasknameRequired and not self.getTaskname():
-                    return [
-                        self.state.text(0)
-                        + ": error - no identifier is given. Skipped the activation of this state."
-                    ]
+                    details = context.copy()
+                    if "filename" in details:
+                        del details["filename"]
 
-                # if self.curCam is None or (
-                #     self.curCam != "Current View"
-                #     and not self.core.appPlugin.isNodeValid(self, self.curCam)
-                # ):
-                #     return [
-                #         self.state.text(0)
-                #         + ": error - no camera is selected. Skipping activation of this state."
-                #     ]
-        
-                outputName, outputPath, hVersion = self.getOutputName(useVersion=useVersion)
-                print("outputName: ", outputName, "outputPath: ",outputPath, "hVersion: ", hVersion)
-                expandedOutputPath = os.path.expandvars(outputPath)
-                print("expanded output path: ", expandedOutputPath)
-                outLength = len(outputName)
-                if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
-                    return [
-                        self.state.text(0)
-                        + " - error - The outputpath is longer than 255 characters (%s), which is not supported on Windows. Please shorten the outputpath by changing the comment, taskname or projectpath."
-                        % outLength
-                    ]
+                    if "extension" in details:
+                        del details["extension"]
 
-                if not os.path.exists(os.path.dirname(expandedOutputPath)):
-                    os.makedirs(os.path.dirname(expandedOutputPath))
-                
-                # if not os.path.exists(expandedOutputPath):
-                #     os.makedirs(expandedOutputPath)
+                    details["version"] = hVersion
+                    details["sourceScene"] = fileName
+                    details["identifier"] = self.getTaskname()
+                    details["comment"] = self.stateManager.publishComment
 
-                details = context.copy()
-                if "filename" in details:
-                    del details["filename"]
+                    if self.mediaType == "3drenders":
+                        infopath = os.path.dirname(expandedOutputPath)
+                    else:
+                        infopath = expandedOutputPath
 
-                if "extension" in details:
-                    del details["extension"]
-
-                details["version"] = hVersion
-                details["sourceScene"] = fileName
-                details["identifier"] = self.getTaskname()
-                details["comment"] = self.stateManager.publishComment
-
-                if self.mediaType == "3drenders":
-                    infopath = os.path.dirname(expandedOutputPath)
-                else:
-                    infopath = expandedOutputPath
-
-                self.core.saveVersionInfo(
-                    filepath=infopath, details=details
-                )
-                
-                self.pluginMHfunctions.setOutputsPaths(self.cb_renderLayer.currentText(), expandedOutputPath)
-                
-                # the aov is necesary for prism logic, we have to remove it fo some of our operations.
-                outputpathnoaov = os.path.join(os.path.dirname(expandedOutputPath),os.path.basename(outputName))
-
-                self.l_pathLast.setText(outputpathnoaov)
-                self.l_pathLast.setToolTip(outputpathnoaov)
-                self.stateManager.saveStatesToScene()
-
-                # rSettings = {
-                #     "outputName": outputName,
-                #     "startFrame": startFrame,
-                #     "endFrame": endFrame,
-                #     "frames": frames,
-                #     "rangeType": rangeType,
-                # }
-
-                # if (
-                #     self.chb_renderPreset.isChecked()
-                #     and "RenderSettings" in self.stateManager.stateTypes
-                # ):
-                #     rSettings["renderSettings"] = getattr(
-                #         self.core.appPlugin,
-                #         "sm_renderSettings_getCurrentSettings",
-                #         lambda x: {},
-                #     )(self)
-                #     self.stateManager.stateTypes["RenderSettings"].applyPreset(
-                #         self.core, self.renderPresets[self.cb_renderPreset.currentText()]
-                #     )
-
-                # self.core.appPlugin.sm_render_preSubmit(self, rSettings)
-
-                # kwargs = {
-                #     "state": self,
-                #     "scenefile": fileName,
-                #     "settings": rSettings,
-                # }
-
-                # result = self.core.callback("preRender", **kwargs)
-                # for res in result:
-                #     if isinstance(res, dict) and res.get("cancel", False):
-                #         return [
-                #             self.state.text(0)
-                #             + " - error - %s" % res.get("details", "preRender hook returned False")
-                #         ]
-                result = "Result=Success"
-                # if not os.path.exists(os.path.expandvars(os.path.dirname(rSettings["outputName"]))):
-                #     os.makedirs(os.path.expandvars(os.path.dirname(rSettings["outputName"])))
-
-                # if self.stateManager.actionSaveDuringPub.isChecked():
-                #     self.core.saveScene(versionUp=False, prismReq=False)
-
-                # if self.core.getConfig("globals", "backupScenesOnPublish", config="project"):
-                #     self.core.entities.backupScenefile(os.path.expandvars(os.path.dirname(rSettings["outputName"])), bufferMinutes=0)
-
-                # if not self.gb_submit.isHidden() and self.gb_submit.isChecked():
-                #     handleMaster = "media" if self.isUsingMasterVersion() else False
-                #     plugin = self.core.plugins.getRenderfarmPlugin(self.cb_manager.currentText())
-                #     if hasattr(self, "chb_redshift") and self.chb_redshift.isChecked() and not self.w_redshift.isHidden():
-                #         sceneDescription = "redshift"
-                #     else:
-                #         sceneDescription = None
-
-                #     result = plugin.sm_render_submitJob(
-                #         self,
-                #         rSettings["outputName"],
-                #         parent,
-                #         handleMaster=handleMaster,
-                #         details=details,
-                #         sceneDescription=sceneDescription
-                #     )
-                #     updateMaster = False
-                # else:
-                #     result = self.core.appPlugin.sm_render_startLocalRender(
-                #         self, rSettings["outputName"], rSettings
-                #     )
-            # else:
-            #     rSettings = self.LastRSettings
-            #     result = self.core.appPlugin.sm_render_startLocalRender(
-            #         self, rSettings["outputName"], rSettings
-            #     )
-            #     outputName = rSettings["outputName"]
-            else:
-                result = "Result=Success"
-            # if not self.renderingStarted:
-            #     self.core.appPlugin.sm_render_undoRenderSettings(self, rSettings)
-
-            if result == "publish paused":
-                return [self.state.text(0) + " - publish paused"]
-            else:
-                if updateMaster:
-                    self.handleMasterVersion(os.path.expandvars(outputName))
-
-            #     kwargs = {
-            #         "state": self,
-            #         "scenefile": fileName,
-            #         "settings": rSettings,
-            #         "result": result,
-            #     }
-
-            #     self.core.callback("postRender", **kwargs)
-
-                if "Result=Success" in result:
-                    return [self.state.text(0) + " - success"]
-                else:
-                    erStr = "%s ERROR - sm_default_imageRenderPublish %s:\n%s" % (
-                        time.strftime("%d/%m/%y %X"),
-                        self.core.version,
-                        result,
+                    self.core.saveVersionInfo(
+                        filepath=infopath, details=details
                     )
-                    if not result.startswith("Execute Canceled: "):
-                        if result == "unknown error (files do not exist)":
-                            QMessageBox.warning(
-                                self.core.messageParent,
-                                "Warning",
-                                "No files were created during the rendering. If you think this is a Prism bug please report it in the forum:\nwww.prism-pipeline.com/forum/\nor write a mail to contact@prism-pipeline.com",
-                            )
-                        else:
-                            self.core.writeErrorLog(erStr)
-                    return [self.state.text(0) + " - error - " + result]
+                    
+                    self.pluginMHfunctions.setOutputsPaths(self.cb_renderLayer.currentText(), expandedOutputPath)
+                    
+                    # the aov is necesary for prism logic, we have to remove it fo some of our operations.
+                    outputpathnoaov = os.path.join(os.path.dirname(expandedOutputPath),os.path.basename(outputName))
+
+                    self.l_pathLast.setText(outputpathnoaov)
+                    self.l_pathLast.setToolTip(outputpathnoaov)
+                    self.stateManager.saveStatesToScene()
+
+                    pathassigned = True
+                    if rlayername in layers:
+                        outnodesdict:dict = self.pluginMHfunctions.getLayerOutNodes(rlayername)
+                        for node in list(outnodesdict.values()):
+                            if not os.path.dirname(expandedOutputPath) in node.base_path:
+                                pathassigned = False
+
+                    if pathassigned:
+                        result = "Result=Success"
+                    else:
+                        result = " - error - The outputpath was not assigned to nodes."
+                    
+                else:
+                    result = "Result=Success"
+
+                # if result == "publish paused":
+                #     return [self.state.text(0) + " - publish paused"]
+                # else:
+                #     if updateMaster:
+                #         self.handleMasterVersion(os.path.expandvars(outputName))
+                
+                if not calledFromMHRender:
+                    if result=="Result=Success":
+                        msgStr = "The Execution was successful."
+                        self.core.popup(msgStr, title="Execute", severity="info",)
+                    elif "error" in result:
+                        msgStr = result.replace(" - error - ", "")
+                        self.core.popup(msgStr, title="Execute Error", severity="info",)
+                    
+            else:
+                if not calledFromMHRender:
+                    message = "Don't update Version is toggled ON\nthe paths on nodes were not updated"
+                    self.core.popup(message,title=None,severity="info",)
+        else:
+            message = "This Layer has no File Output nodes\nasociated with it."
+            self.core.popup(message,title=None,severity="info",)
+        
+        ### RETURN ###
+        if "Result=Success" in result:
+            return [self.state.text(0) + " - success"]
+        else:
+            erStr = "%s ERROR - sm_default_imageRenderPublish %s:\n%s" % (
+                time.strftime("%d/%m/%y %X"),
+                self.core.version,
+                result,
+            )
+            if not result.startswith("Execute Canceled: "):
+                self.core.writeErrorLog(erStr)
+            return [self.state.text(0) + " - error - " + result]
 
     @err_catcher(name=__name__)
     def isUsingMasterVersion(self):

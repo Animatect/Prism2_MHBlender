@@ -125,7 +125,8 @@ class %s(QWidget, %s.%s, %s.%sClass):
                     sm.rClickedItem = parentState
 
                     actExecute = QAction("Execute", sm)
-                    actExecute.triggered.connect(lambda: sm.publish(executeState=True))
+                    # successPopup is being handled in the export state for these states.
+                    actExecute.triggered.connect(lambda: sm.publish(executeState=True,successPopup=False))
 
                     menuExecuteV = QMenu("Execute as previous version", sm)
 

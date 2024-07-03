@@ -535,7 +535,7 @@ class Prism_BlenderMHExtension_Functions(object):
         return lowest_y_node, lowest_y_node.location + mathutils.Vector((0, -lowest_y_node.dimensions[1]))
 
     @err_catcher(name=__name__)
-    def getRLNode(self, layername):
+    def getRLNode(self, layername, cancreate=True):
         nodename = 'Prism_RL_' + layername
         nodetree = bpy.context.scene.node_tree
         rendernodes = [n for n in nodetree.nodes if n.type == 'R_LAYERS']
@@ -545,7 +545,7 @@ class Prism_BlenderMHExtension_Functions(object):
                 if n.name == nodename:
                     rendernode = n
 
-        if not rendernode:
+        if not rendernode and cancreate:
             nodes:list = self.getPatternedLayerNodes('Prism_RL_')
             sorted_nodes:list = self.sortNodesByYposition(nodes)
 
