@@ -433,7 +433,7 @@ class Prism_BlenderMHExtension_Functions(object):
     def getSlotname(self, layername, aovname):
         if aovname == "Image":
             aovname = "beauty"
-        return layername + "_" + aovname + "/" + layername + "_" + aovname + "_"
+        return layername + "_" + aovname + "/" + layername + "_" + aovname + "_####.exr"
 
     @err_catcher(name=__name__)
     def connectNodes(self, nodetree, layername, renderpass, out_node)->None:
@@ -649,7 +649,7 @@ class Prism_BlenderMHExtension_Functions(object):
                 # Remove the AOV beauty from the base path
                 allpath = os.path.dirname(os.path.normpath(basepath + "\\"))
                 if key == 'crypto':
-                    allpath = os.path.normpath(os.path.join(allpath, layername + "_CryptoMatte"))
+                    allpath = os.path.normpath(os.path.join(allpath, layername + "_Cryptomatte", layername + "_CryptoMatte_####.exr"))
 
                 node.base_path = allpath
 
