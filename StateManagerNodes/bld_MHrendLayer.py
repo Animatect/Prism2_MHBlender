@@ -971,27 +971,27 @@ class MHrendLayerClass(object):
         self.refreshContext()
 
         # update Cams
-        self.cb_cam.clear()
-        self.camlist = camNames = []
+        # self.cb_cam.clear()
+        # self.camlist = camNames = []
 
-        if not self.stateManager.standalone:
-            self.camlist = self.core.appPlugin.getCamNodes(self, cur=True)
-            camNames = [self.core.appPlugin.getCamName(self, i) for i in self.camlist]
+        # if not self.stateManager.standalone:
+        #     self.camlist = self.core.appPlugin.getCamNodes(self, cur=True)
+        #     camNames = [self.core.appPlugin.getCamName(self, i) for i in self.camlist]
 
-        self.cb_cam.addItems(camNames)
+        # self.cb_cam.addItems(camNames)
 
-        if self.curCam in self.camlist:
-            self.cb_cam.setCurrentIndex(self.camlist.index(self.curCam))
-        else:
-            self.cb_cam.setCurrentIndex(0)
-            if len(self.camlist) > 0:
-                self.curCam = self.camlist[0]
-            else:
-                self.curCam = None
+        # if self.curCam in self.camlist:
+        #     self.cb_cam.setCurrentIndex(self.camlist.index(self.curCam))
+        # else:
+        #     self.cb_cam.setCurrentIndex(0)
+        #     if len(self.camlist) > 0:
+        #         self.curCam = self.camlist[0]
+        #     else:
+        #         self.curCam = None
 
-            self.stateManager.saveStatesToScene()
+        #     self.stateManager.saveStatesToScene()
 
-        self.updateRange()
+        # self.updateRange()
 
         if not self.core.mediaProducts.getUseMaster():
             self.w_master.setVisible(False)
@@ -1025,6 +1025,7 @@ class MHrendLayerClass(object):
 
             self.nameChanged(self.e_name.text())            
             self.isDontUpdateVersionToggled(self.chb_dontUpdateV.isChecked())
+            self.stateManager.saveStatesToScene()
 
         return True
 

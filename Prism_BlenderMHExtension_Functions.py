@@ -130,7 +130,29 @@ class Prism_BlenderMHExtension_Functions(object):
         passNames = self.getViewLayerAOVs(origin.cb_renderLayer.currentText())
         logger.debug("viewlayer aovs: %s" % passNames)
 
+        tech = []
+        main = []
+        crypto = []
+        for i in sorted(passNames, key=lambda s: s.lower()):
+            passname:str = self.AOVDict[i.lower()]
+            if self.compareTechPass(passname):
+                tech.append(i)
+            elif 'crypto' in passname.lower():
+                crypto.append(i)
+            else:
+                main.append(i)
+        passNames = tech + main + crypto
+
         origin.lw_passes.addItems(passNames)
+        for index in range(origin.lw_passes.count()):
+            item = origin.lw_passes.item(index)
+            i = item.text()
+            if i in tech:
+                item.setBackground(QColor("#995233"))
+            elif i in crypto:
+                item.setBackground(QColor("#429933"))
+            else:
+                item.setBackground(QColor("#365e99"))
 
     @err_catcher(name=__name__)
     def sm_render_addRenderPass(self, origin, passName, steps, layername):
