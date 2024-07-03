@@ -385,9 +385,13 @@ class MHrendLayerClass(object):
             name = self.state.text(0)
             if checked:
                 name += sufix
+                self.state.setBackground(0, QColor("#b8382a"))
+                self.gb_output.setStyleSheet("border: 3px solid #b8382a;")
             else:
                 if self.state.text(0).endswith(sufix):
                     name = name.replace(sufix, "")
+                    self.state.setBackground(0, QColor("#2a2a2a"))
+                    self.gb_output.setStyleSheet("border: 1px solid #3498db;")
             
             self.state.setText(0, name)
         self.stateManager.saveStatesToScene
