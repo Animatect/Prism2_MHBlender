@@ -178,17 +178,33 @@ class %s(QWidget, %s.%s, %s.%sClass):
                                 existingVersions = sm.core.products.getVersionsFromSameVersionStack(
                                     outPath
                                 )
-                            for version in sorted(
-                                existingVersions, key=lambda x: x["version"], reverse=True
-                            ):
-                                name = version["version"]
-                                actV = QAction(name, sm)
-                                actV.triggered.connect(
-                                    lambda y=None, v=version["version"]: sm.publish(
-                                        executeState=True, useVersion=v
+                            
+                            if parentState.ui.className == "MHRender":
+                                actV = None
+                                for version in sorted(
+                                    existingVersions, key=lambda x: x["version"], reverse=True
+                                ):
+                                    name = "last version"
+                                    actV = QAction(name, sm)
+                                    actV.triggered.connect(
+                                        lambda y=None, v=version["version"]: sm.publish(
+                                            executeState=True, useVersion=v
+                                        )
                                     )
-                                )
-                                menuExecuteV.addAction(actV)
+                                if actV:
+                                    menuExecuteV.addAction(actV)
+                            else:
+                                for version in sorted(
+                                    existingVersions, key=lambda x: x["version"], reverse=True
+                                ):
+                                    name = version["version"]
+                                    actV = QAction(name, sm)
+                                    actV.triggered.connect(
+                                        lambda y=None, v=version["version"]: sm.publish(
+                                            executeState=True, useVersion=v
+                                        )
+                                    )
+                                    menuExecuteV.addAction(actV)
 
                     if menuExecuteV.isEmpty():
                         menuExecuteV.setEnabled(False)

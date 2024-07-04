@@ -178,6 +178,8 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def handleExtraCSS(self):
+        # Item Color #
+        self.state.setBackground(0, QColor("#365e99"))
         ## BORDERS ##
         # Remove borders
         self.setStyleSheet("""
@@ -390,7 +392,8 @@ class MHrendLayerClass(object):
             else:
                 if self.state.text(0).endswith(sufix):
                     name = name.replace(sufix, "")
-                    self.state.setBackground(0, QColor("#2a2a2a"))
+                    # self.state.setBackground(0, QColor("#2a2a2a"))
+                    self.state.setBackground(0, QColor("#365e99"))
                     self.gb_output.setStyleSheet("border: 1px solid #3498db;")
             
             self.state.setText(0, name)
@@ -1380,27 +1383,29 @@ class MHrendLayerClass(object):
         return outputPathData["path"], outputFolder, hVersion
 
     @err_catcher(name=__name__)
-    def executeState(self, parent, useVersion="next", calledFromMHRender=False)->None:
+    def executeState(self, parent, useVersion="next", calledFromMHRender=False, keepcurrentV=False)->None:
         willexecute = True
         layerhasoutnodes = False
         result = "Result=Success"
         # check if there are nodes asociated to this layer.
         rlayername = self.cb_renderLayer.currentText()
         layers = self.pluginMHfunctions.getRenderLayers()
-        if rlayername in layers:
-            outnodesdict:dict = self.pluginMHfunctions.getLayerOutNodes(rlayername)
-            for v in list(outnodesdict.values()):
-                if v:
-                    layerhasoutnodes = True
-                    break
+        if not calledFromMHRender:
+            if rlayername in layers:
+                outnodesdict:dict = self.pluginMHfunctions.getLayerOutNodes(rlayername)
+                for v in list(outnodesdict.values()):
+                    if v:
+                        layerhasoutnodes = True
+                        break
+        else:
+            layerhasoutnodes = True
         if layerhasoutnodes:
             # if dont update version is checked and there is a path already.
             print("l_pathLast.text(): ", self.l_pathLast.text())
-            if self.chb_dontUpdateV.isChecked() and self.l_pathLast.text() != None:
+            if (self.chb_dontUpdateV.isChecked() or keepcurrentV) and self.l_pathLast.text() != None:
                 willexecute = False
             
             if willexecute:
-
                 updateMaster = True
                 fileName = self.core.getCurrentFileName()
                 context = self.getCurrentContext()
@@ -1472,11 +1477,11 @@ class MHrendLayerClass(object):
                 else:
                     result = "Result=Success"
 
-                # if result == "publish paused":
-                #     return [self.state.text(0) + " - publish paused"]
-                # else:
-                #     if updateMaster:
-                #         self.handleMasterVersion(os.path.expandvars(outputName))
+                if result == "publish paused":
+                    return [self.state.text(0) + " - publish paused"]
+                else:
+                    if updateMaster:
+                        self.handleMasterVersion(os.path.expandvars(outputName))
                 
                 if not calledFromMHRender:
                     if result=="Result=Success":
@@ -1487,12 +1492,15 @@ class MHrendLayerClass(object):
                         self.core.popup(msgStr, title="Execute Error", severity="info",)
                     
             else:
+                result = "Result=Success"
                 if not calledFromMHRender:
                     message = "Don't update Version is toggled ON\nthe paths on nodes were not updated"
                     self.core.popup(message,title=None,severity="info",)
         else:
-            message = "This Layer has no File Output nodes\nasociated with it."
-            self.core.popup(message,title=None,severity="info",)
+            result = " - error - Layer had no nodes."
+            if not calledFromMHRender:
+                message = "This Layer has no File Output nodes\nasociated with it."
+                self.core.popup(message,title=None,severity="info",)
         
         ### RETURN ###
         if "Result=Success" in result:

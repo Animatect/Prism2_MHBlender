@@ -706,6 +706,42 @@ class Prism_BlenderMHExtension_Functions(object):
 
     ######################################
     #                                    #
+    #######   MHRenderFunctions   ########
+    #                                    #
+    ######################################
+    @err_catcher(name=__name__)
+    def sm_render_preSubmit(self, origin, rSettings):
+        if origin.chb_resOverride.isChecked():
+            rSettings["width"] = bpy.context.scene.render.resolution_x
+            rSettings["height"] = bpy.context.scene.render.resolution_y
+            bpy.context.scene.render.resolution_x = origin.sp_resWidth.value()
+            bpy.context.scene.render.resolution_y = origin.sp_resHeight.value()
+
+        imgFormat = origin.cb_format.currentText()        
+        if imgFormat == ".jpg":
+            fileFormat = "JPEG"
+
+        rSettings["prev_start"] = bpy.context.scene.frame_start
+        rSettings["prev_end"] = bpy.context.scene.frame_end
+        rSettings["fileformat"] = bpy.context.scene.render.image_settings.file_format
+        rSettings["overwrite"] = bpy.context.scene.render.use_overwrite
+        rSettings["fileextension"] = bpy.context.scene.render.use_file_extension
+        rSettings["resolutionpercent"] = bpy.context.scene.render.resolution_percentage
+        rSettings["origOutputName"] = rSettings["outputName"]
+        bpy.context.scene["PrismIsRendering"] = True
+        bpy.context.scene.render.filepath = rSettings["outputName"]
+        bpy.context.scene.render.image_settings.file_format = fileFormat
+        bpy.context.scene.render.use_overwrite = True
+        bpy.context.scene.render.use_file_extension = False
+        bpy.context.scene.render.resolution_percentage = 100
+        bpy.context.scene.camera = bpy.context.scene.objects[origin.curCam]
+
+        if not os.path.exists(os.path.dirname(rSettings["outputName"])):
+            os.makedirs(os.path.dirname(rSettings["outputName"]))
+
+
+    ######################################
+    #                                    #
     #######       CALLBACKS       ########
     #                                    #
     ######################################
