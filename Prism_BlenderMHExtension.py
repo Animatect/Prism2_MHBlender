@@ -44,6 +44,7 @@ class MHBlenderExtension:
                 self.monkeypatchedsm = origin
                 #
                 self.core.plugins.monkeyPatch(origin.rclTree, self.rclTree, self, force=True)
+                self.core.plugins.monkeyPatch(self.core.appPlugin.sm_export_exportShotcam, self.sm_export_exportShotcam, self, force=True)
                 #
                 self.stateTypeCreator(customstate, origin)
                 
@@ -54,6 +55,12 @@ class MHBlenderExtension:
                 import Prism_BlenderMHExtension_Functions
                 self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
+
+    @err_catcher(name=__name__)
+    def sm_export_exportShotcam(self, origin, startFrame, endFrame, outputName):
+        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_export_exportShotcam, origin, startFrame, endFrame, outputName)
+        self.functions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
+        # print("is monkeypatched: ", "\norigin: ", origin, "\nstartFrame: ", startFrame, ", endFrame: ", endFrame, "\noutputName: ", outputName, "\n#######\n")
 
     @err_catcher(name=__name__)
     def stateTypeCreator(self, stateName, stateManager):

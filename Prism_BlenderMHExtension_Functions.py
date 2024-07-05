@@ -10,6 +10,7 @@ import operator
 import tempfile
 import math
 import mathutils
+import json
 
 import bpy
 
@@ -768,3 +769,237 @@ class Prism_BlenderMHExtension_Functions(object):
                     bpy.context.scene.node_tree.nodes.remove(rlnode)
                     self.repositionRenderLayerNodes()
             
+    ##########################################
+    #                                        #
+    ####### MH FUSION CAMERA EXPORTER ########
+    #                                        #
+    ##########################################
+
+    @err_catcher(name=__name__)
+    def sm_export_exportBlenderShotcam(self, origin, startFrame, endFrame, outputName, blenderplugin):
+        # Store original objs.
+        original_active = None
+        current_frame = bpy.context.scene.frame_current
+
+        blenderplugin.selectCam(origin)
+        if bpy.app.version < (4, 0, 0):
+            blenderplugin.getOverrideContext(origin)
+            original_active = bpy.context.view_layer.objects.active
+            self.exportBlendCam(startFrame, endFrame, outputName)
+        else:
+            with bpy.context.temp_override(**blenderplugin.getOverrideContext()):
+                original_active = bpy.context.view_layer.objects.active
+                self.exportBlendCam(startFrame, endFrame, outputName)
+        
+        # Reselect original objects.
+        bpy.ops.object.select_all(action='DESELECT')
+        # for obj in original_selection:
+        #     obj.select_set(True)
+        if original_active:
+            bpy.context.view_layer.objects.active = original_active
+
+        # Go back to original frame.
+        bpy.context.scene.frame_set(current_frame)
+
+    @err_catcher(name=__name__)
+    def exportBlendCam(self, startFrame, endFrame, outputName):
+        original_selection = bpy.context.selected_objects
+        # Select the object you want to duplicate
+        original_object = bpy.context.selected_objects[0]
+
+        # Deselect all objects
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # Select the original object
+        original_object.select_set(True)
+
+        # Duplicate the object
+        bpy.ops.object.duplicate()
+        duplicated_object = bpy.context.selected_objects[0]
+
+        # Rename the duplicated object (optional)
+        duplicated_object.name = original_object.name + "_duplicate"
+
+        # Select the duplicated object
+        duplicated_object.select_set(True)
+        bpy.context.view_layer.objects.active = duplicated_object
+
+        # Define the frame range for baking
+        start_frame = startFrame
+        end_frame = endFrame
+
+        # Bake the animation
+        bpy.ops.nla.bake(
+            frame_start=start_frame,
+            frame_end=end_frame,
+            only_selected=True,
+            visual_keying=True,
+            clear_constraints=True,
+            clear_parents=True,
+            use_current_action=True,
+            bake_types={'OBJECT'}
+        )
+
+        # DO THE EXPORTING #
+        self.get_cam_animate_dict(duplicated_object, startFrame, endFrame, outputName)
+
+        #Delete the duplicate
+        bpy.ops.object.select_all(action='DESELECT')
+        duplicated_object.select_set(True)
+        bpy.context.view_layer.objects.active = duplicated_object
+        bpy.ops.object.delete()
+
+        #Reselect original objects.
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in original_selection:
+            obj.select_set(True)
+
+    @err_catcher(name=__name__)
+    def get_cam_animate_dict(self, obj, startFrame, endFrame, outputName):
+        if obj.type !=  'CAMERA':
+                return ['no es una cámara']
+
+        ####Checar si el objeto tiene animacion
+        try:
+            obj.animation_data.action
+        except Exception:
+            print('el objetio no tiene animacion')
+            self.get_cam_dict(obj)
+            return
+        
+        if obj.data.sensor_fit in ["HORIZONTAL", "AUTO"]:
+            sensor_direction = "H"
+        elif obj.data.sensor_fit == "VERTICAL":
+            sensor_direction = "V"
+
+        if sensor_direction == "H":
+            sensor_value = obj.data.sensor_width
+        elif sensor_direction == "V":
+            sensor_value = obj.data.sensor_height
+
+        sensor_value = self.mm_to_inch(sensor_value)
+        ########################
+        #Matrix es una clase de mathutils
+        rot_x_neg90 = mathutils.Matrix.Rotation(-math.pi/2.0, 4, 'X')
+
+        scene = bpy.context.scene
+        frame_range = range(startFrame, endFrame+1)
+        data = {}
+
+        #Translation
+        # X
+        data['trans_x'] = self.gettranslationdic(obj, scene, frame_range, 'trans_x') 
+        # Y (Fusion Z)
+        data['trans_y'] = self.gettranslationdic(obj, scene, frame_range, 'trans_y') 
+        # Z (Fusion -Y)
+        data['trans_z'] = self.gettranslationdic(obj, scene, frame_range, 'trans_z')
+
+        #Rotation
+        # X (Fusion X)
+        data['rota_x'] = self.getrotationdic(obj, scene, frame_range, 'rota_x')
+        # Y (Fusion Z)
+        data['rota_y'] = self.getrotationdic(obj, scene, frame_range, 'rota_y')
+        # Z (Fusion -Y)
+        data['rota_z'] = self.getrotationdic(obj, scene, frame_range, 'rota_z')
+        
+        ########################
+        data['focal_length'] = obj.data.lens
+        data['clip_start'] = obj.data.clip_start
+        data['clip_end'] = obj.data.clip_end
+        data['name'] = obj.name
+        data['sensor_direction'] = sensor_direction
+        data['sensor_value'] = sensor_value
+        #camera_data = {frame: data}
+        camera_data = {"cam_animate_dict": data}
+        file_path = os.path.normpath(outputName +'.bcam')
+        _isWrite = self.write_ani_data(file_path,camera_data)
+        
+        return {"cam_animate_dict": file_path} if _isWrite else _isWrite
+
+    @err_catcher(name=__name__)
+    def get_cam_dict(self,obj):
+        if obj.type !=  'CAMERA':
+                return ['no es una cámara']
+
+        #si el objeto es una cámara vamos a coleccionar sus propiedades
+        if obj.data.sensor_fit in ["HORIZONTAL", "AUTO"]:
+            sensor_direction = "H"
+        elif obj.data.sensor_fit == "VERTICAL":
+            sensor_direction = "V"
+
+        if sensor_direction == "H":
+            sensor_value = obj.data.sensor_width
+        elif sensor_direction == "V":
+            sensor_value = obj.data.sensor_height
+
+        sensor_value = self.mm_to_inch(sensor_value)
+
+        data = {}
+        data['translation'] = {
+            'X': obj.location.x,
+            'Y': obj.location.y,
+            'Z': obj.location.z,
+        }
+        data['rotation'] = {
+            'X': obj.rotation_euler.x,
+            'Y': obj.rotation_euler.y,
+            'Z': obj.rotation_euler.z,
+        }
+        data['focal_length'] = obj.data.lens
+        data['clip_start'] = obj.data.clip_start
+        data['clip_end'] = obj.data.clip_end
+        data['name'] = obj.name
+        data['sensor_direction'] = sensor_direction
+        data['sensor_value'] = sensor_value
+        camera_data = {bpy.data.scenes['Scene'].frame_current: data}
+        #camera_data = {"cam_dict": camera_data}
+
+        #return camera_data
+        file_path = os.path.normpath( + '.json')
+        _isWrite = self.write_ani_data(file_path,camera_data)
+        return {"cam_animate_dict": file_path} if _isWrite else _isWrite
+    
+    @err_catcher(name=__name__)
+    def gettranslationdic(self, obj, scene, frame_range, element:str):
+        dic = {}
+        for f in frame_range:
+            scene.frame_set(f)
+            matrix = obj.matrix_world.copy()
+            if element == 'trans_x':
+                dic[str(f)] = matrix.to_translation()[0]
+            elif element == 'trans_y':
+                dic[str(f)] = (matrix.to_translation()[2])
+            elif element == 'trans_z':
+                dic[str(f)] = (-matrix.to_translation()[1])
+        #print(dic)
+        return dic
+
+    @err_catcher(name=__name__)
+    def getrotationdic(self, obj, scene, frame_range, element:str):
+        rot_x_neg90 = mathutils.Matrix.Rotation(-math.pi/2.0, 4, 'X')
+        dic = {}
+        for f in frame_range:
+            scene.frame_set(f)
+            matrix_org = obj.matrix_world.copy()
+            matrix = rot_x_neg90 @ matrix_org
+            if element == 'rota_x':
+                dic[str(f)] = math.degrees(matrix.to_euler()[0])
+            elif element == 'rota_y':
+                dic[str(f)] = math.degrees(matrix.to_euler()[1])
+            elif element == 'rota_z':
+                dic[str(f)] = math.degrees(matrix.to_euler()[2])
+        #print(dic)
+        return dic
+
+    def mm_to_inch(self, value: float) -> float:
+        return value / 25.4
+
+    #Escribimos un JsonFile con la cámara animada
+    def write_ani_data(self,file_path,data):
+        try:
+            str_data = json.dumps(data,indent=4)
+            with open(file_path,"w",encoding="utf-8") as f:
+                f.write(str_data)
+        except Exception:
+            return 0
+        return 1
