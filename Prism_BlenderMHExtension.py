@@ -36,6 +36,7 @@ class MHBlenderExtension:
                 
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
+        self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
 
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
@@ -117,7 +118,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
     #Right click menu from nodes on state manager to get previous versions.
     @err_catcher(name=__name__)
     def rclTree(self, pos, activeList):
-        sm = self.monkeypatchedsm 
+        sm = self.monkeypatchedsm
         if sm:
             renderclasses = ["MHrendLayer", "MHRender"]
             # we chack if the rclick is over a state
@@ -246,3 +247,22 @@ class %s(QWidget, %s.%s, %s.%sClass):
                 else:
                     # Call original Function
                     self.core.plugins.callUnpatchedFunction(sm.rclTree, pos, activeList)
+                    
+    @err_catcher(name=__name__)
+    def getVersionStackContextFromPath(self, filepath):
+        context = self.core.paths.getCachePathData(filepath)
+        if "asset_path" in context:
+            context["asset"] = os.path.basename(context["asset_path"])
+
+        if "version" in context:
+            del context["version"]
+        if "comment" in context:
+            del context["comment"]
+        if "user" in context:
+            del context["user"]
+        
+        # Bruteforce correct bug that wont let shotcam get versions
+        if "\\" in context["product"]:
+            context["product"] = context["product"].split("\\")[0]
+
+        return context
