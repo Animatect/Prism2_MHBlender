@@ -818,7 +818,7 @@ class Prism_BlenderMHExtension_Functions(object):
         duplicated_object = bpy.context.selected_objects[0]
 
         # Rename the duplicated object (optional)
-        duplicated_object.name = original_object.name + "_duplicate"
+        duplicated_object.name = original_object.name + "_bcambakedduplicate"
 
         # Select the duplicated object
         duplicated_object.select_set(True)
@@ -906,7 +906,7 @@ class Prism_BlenderMHExtension_Functions(object):
         data['focal_length'] = obj.data.lens
         data['clip_start'] = obj.data.clip_start
         data['clip_end'] = obj.data.clip_end
-        data['name'] = obj.name
+        data['name'] = obj.name.replace("_bcambakedduplicate","")
         data['sensor_direction'] = sensor_direction
         data['sensor_value'] = sensor_value
         #camera_data = {frame: data}
