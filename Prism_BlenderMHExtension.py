@@ -56,11 +56,31 @@ class MHBlenderExtension:
                 import Prism_BlenderMHExtension_Functions
                 self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
+                
+    @err_catcher(name=__name__)
+    def is_object_excluded_from_view_layer(self, obj):
+        import bpy
+        view_layer = bpy.context.view_layer
+
+        for collection in obj.users_collection:
+            # Check if the collection is excluded from the view layer
+            layer_collection = view_layer.layer_collection
+            collection_in_layer = layer_collection.children.get(collection.name)
+            if collection_in_layer and collection_in_layer.exclude:
+                return True
+
+        return False
 
     @err_catcher(name=__name__)
     def sm_export_exportShotcam(self, origin, startFrame, endFrame, outputName):
-        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_export_exportShotcam, origin, startFrame, endFrame, outputName)
-        self.functions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
+        import bpy
+        if origin.curCam in bpy.data.objects:
+            cam = bpy.data.objects[origin.curCam]
+            if self.is_object_excluded_from_view_layer(cam) or cam.hide_get():
+                self.core.popup("Object not visible in viewport at the moment")
+            else:
+                self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_export_exportShotcam, origin, startFrame, endFrame, outputName)
+                self.functions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
         # print("is monkeypatched: ", "\norigin: ", origin, "\nstartFrame: ", startFrame, ", endFrame: ", endFrame, "\noutputName: ", outputName, "\n#######\n")
 
     @err_catcher(name=__name__)
