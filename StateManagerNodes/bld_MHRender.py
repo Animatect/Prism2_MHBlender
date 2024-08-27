@@ -703,6 +703,8 @@ class MHRenderClass(object):
 		self.w_context.setHidden(not self.allowCustomContext)
 		self.refreshContext()
 
+		self.pluginMHfunctions.setUseNodes()
+
 		# update Cams
 		self.cb_cam.clear()
 		self.camlist = camNames = []

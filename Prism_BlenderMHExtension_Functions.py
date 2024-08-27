@@ -612,6 +612,18 @@ class Prism_BlenderMHExtension_Functions(object):
 
     
     ##################################
+    @err_catcher(name=__name__)
+    def setUseNodes(self):
+        # Ensure you're in the right context for the compositor
+        bpy.context.scene.use_nodes = True
+
+        # Access the compositor node tree
+        node_tree = bpy.context.scene.node_tree
+
+        # Check if the node tree exists, create if not
+        if not node_tree:
+            bpy.context.scene.use_nodes = True
+
 
     ##FUNCION PRINCIPAL
     # !CallFromMHRendLayer
