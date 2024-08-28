@@ -293,6 +293,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
         ####################  MONKEYPATCHED  ######################
         #We get the view layer for the current context as default
         #Then we try to get what is the view layer for the current window.
+        #This could be easily combined with the next block but I prefer it like this to see whats monkeypatched
         import bpy
 
         view_layer = bpy.context.view_layer
