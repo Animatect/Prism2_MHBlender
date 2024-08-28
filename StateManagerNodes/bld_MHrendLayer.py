@@ -999,6 +999,8 @@ class MHrendLayerClass(object):
         #     self.stateManager.saveStatesToScene()
 
         # self.updateRange()
+        
+        self.pluginMHfunctions.setUseNodes()
 
         if not self.core.mediaProducts.getUseMaster():
             self.w_master.setVisible(False)
