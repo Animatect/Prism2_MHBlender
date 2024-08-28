@@ -46,6 +46,7 @@ class MHBlenderExtension:
                 #
                 self.core.plugins.monkeyPatch(origin.rclTree, self.rclTree, self, force=True)
                 self.core.plugins.monkeyPatch(self.core.appPlugin.sm_export_exportShotcam, self.sm_export_exportShotcam, self, force=True)
+                self.core.plugins.monkeyPatch(self.core.appPlugin.sm_playblast_createPlayblast, self.sm_playblast_createPlayblast, self, force=True)
                 #
                 self.stateTypeCreator(customstate, origin)
                 
@@ -266,3 +267,79 @@ class %s(QWidget, %s.%s, %s.%sClass):
             context["product"] = context["product"].split("\\")[0]
 
         return context
+    
+    @err_catcher(name=__name__)
+    def sm_playblast_createPlayblast(self, origin, jobFrames, outputName):
+        ####################  MONKEYPATCHED  ######################
+        #We get the view layer for the current context as default
+        #Then we try to get what is the view layer for the current window.
+        import bpy
+
+        view_layer = bpy.context.view_layer
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    view_layer = window.view_layer
+                    # print("Active view layer:", view_layer.name)
+                    break
+        ###########################################################
+
+        renderAnim = jobFrames[0] != jobFrames[1]
+        if origin.curCam is not None:
+            bpy.context.scene.camera = bpy.context.scene.objects[origin.curCam]
+            for window in bpy.context.window_manager.windows:
+                screen = window.screen
+                for area in screen.areas:
+                    if area.type == "VIEW_3D":
+                        area.spaces[0].region_3d.view_perspective = "CAMERA"
+                        break
+
+        prevRange = [bpy.context.scene.frame_start, bpy.context.scene.frame_end]
+        prevRes = [
+            bpy.context.scene.render.resolution_x,
+            bpy.context.scene.render.resolution_y,
+            bpy.context.scene.render.resolution_percentage,
+        ]
+        prevOutput = [
+            bpy.context.scene.render.filepath,
+            bpy.context.scene.render.image_settings.file_format,
+        ]
+
+        bpy.context.scene.frame_start = jobFrames[0]
+        bpy.context.scene.frame_end = jobFrames[1]
+
+        if origin.chb_resOverride.isChecked():
+            bpy.context.scene.render.resolution_x = origin.sp_resWidth.value()
+            bpy.context.scene.render.resolution_y = origin.sp_resHeight.value()
+            bpy.context.scene.render.resolution_percentage = 100
+
+        bpy.context.scene.render.filepath = os.path.normpath(outputName)
+        base, ext = os.path.splitext(outputName)
+        if ext == ".jpg":
+            bpy.context.scene.render.image_settings.file_format = "JPEG"
+        if ext == ".mp4":
+            bpy.context.scene.render.image_settings.file_format = "FFMPEG"
+            bpy.context.scene.render.ffmpeg.format = "MPEG4"
+            bpy.context.scene.render.ffmpeg.audio_codec = "MP3"
+
+        ####################  MONKEYPATCHED  ######################        
+        #Instead of getting the override context as is, we inject the actual current Layer if possible.
+
+        ctx = self.core.appPlugin.getOverrideContext(origin)
+        ctx['view_layer'] = view_layer
+        if bpy.app.version < (4, 0, 0):
+            bpy.ops.render.opengl(
+                ctx, animation=renderAnim, write_still=True, view_context=True)
+        else:
+            with bpy.context.temp_override(**ctx):
+                bpy.ops.render.opengl(animation=renderAnim, write_still=True)
+
+        ###############################################################
+
+        bpy.context.scene.frame_start = prevRange[0]
+        bpy.context.scene.frame_end = prevRange[1]
+        bpy.context.scene.render.resolution_x = prevRes[0]
+        bpy.context.scene.render.resolution_y = prevRes[1]
+        bpy.context.scene.render.resolution_percentage = prevRes[2]
+        bpy.context.scene.render.filepath = prevOutput[0]
+        bpy.context.scene.render.image_settings.file_format = prevOutput[1]
