@@ -914,8 +914,10 @@ class Prism_BlenderMHExtension_Functions(object):
         # Z (Fusion -Y)
         data['rota_z'] = self.getrotationdic(obj, scene, frame_range, 'rota_z')
         
-        ########################
-        data['focal_length'] = obj.data.lens
+        #Focal_Length
+        data['focal_length'] = self.getrfocallendic(obj, scene, frame_range)
+
+        ########################        
         data['clip_start'] = obj.data.clip_start
         data['clip_end'] = obj.data.clip_end
         data['name'] = obj.name.replace("_bcambakedduplicate","")
@@ -1001,6 +1003,14 @@ class Prism_BlenderMHExtension_Functions(object):
             elif element == 'rota_z':
                 dic[str(f)] = math.degrees(matrix.to_euler()[2])
         #print(dic)
+        return dic
+    
+    @err_catcher(name=__name__)
+    def getrfocallendic(self, obj, scene, frame_range):
+        dic = {}
+        for f in frame_range:
+            scene.frame_set(f)
+            dic[str(f)] = obj.data.lens
         return dic
 
     def mm_to_inch(self, value: float) -> float:
