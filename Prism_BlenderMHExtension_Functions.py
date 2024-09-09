@@ -792,14 +792,26 @@ class Prism_BlenderMHExtension_Functions(object):
         # Store original objs.
         original_active = None
         current_frame = bpy.context.scene.frame_current
+        view_layer = bpy.context.view_layer
+        for window in bpy.context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == "VIEW_3D":
+                    #We try to get what is the view layer for the current window.
+                    view_layer = window.view_layer
+                    break
 
         blenderplugin.selectCam(origin)
+        ctx = blenderplugin.getOverrideContext(origin)
+        ctx['view_layer'] = view_layer
         if bpy.app.version < (4, 0, 0):
-            blenderplugin.getOverrideContext(origin)
+            # blenderplugin.getOverrideContext(origin)
+            ctx
             original_active = bpy.context.view_layer.objects.active
             self.exportBlendCam(startFrame, endFrame, outputName)
         else:
-            with bpy.context.temp_override(**blenderplugin.getOverrideContext()):
+            # with bpy.context.temp_override(**blenderplugin.getOverrideContext()):
+            with bpy.context.temp_override(**ctx):
                 original_active = bpy.context.view_layer.objects.active
                 self.exportBlendCam(startFrame, endFrame, outputName)
         
@@ -816,6 +828,7 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def exportBlendCam(self, startFrame, endFrame, outputName):
         original_selection = bpy.context.selected_objects
+        print("VL: ", bpy.context.view_layer)
         # Select the object you want to duplicate
         original_object = bpy.context.selected_objects[0]
 
@@ -869,7 +882,7 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def get_cam_animate_dict(self, obj, startFrame, endFrame, outputName):
         if obj.type !=  'CAMERA':
-                return ['no es una cámara']
+            return ['no es una cámara']
 
         ####Checar si el objeto tiene animacion
         try:
