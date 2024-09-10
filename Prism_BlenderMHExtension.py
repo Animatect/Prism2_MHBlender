@@ -36,7 +36,6 @@ class MHBlenderExtension:
                 
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
-        self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
 
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
@@ -57,6 +56,7 @@ class MHBlenderExtension:
                 import Prism_BlenderMHExtension_Functions
                 self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
+                self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
                 
     @err_catcher(name=__name__)
     def is_object_excluded_from_view_layer(self, obj):
