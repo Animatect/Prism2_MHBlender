@@ -697,6 +697,7 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def on_RenderLayerCb_changed(self, index):
+        # print(f"CHANGING UP RENDER LAYER, SM loading: {self.stateManager.loading}")
         origname = self.layername
         chosenname = self.cb_renderLayer.currentText()
         # if is not the same one
@@ -767,7 +768,8 @@ class MHrendLayerClass(object):
 
     @err_catcher(name=__name__)
     def on_RenderLayerCb_setup(self):
-        if self.core.status == "loaded":
+        if self.core.status == "loaded" and not self.stateManager.loading:
+            # print(f"SETTING UP RENDER LAYER, SM loading: {self.stateManager.loading}")
             origname = self.layername
             chosenname = self.cb_renderLayer.currentText()
             isused, remaininglayers = self.is_RenderLayerCb_used()
