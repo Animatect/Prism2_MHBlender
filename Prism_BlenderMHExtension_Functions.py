@@ -454,9 +454,11 @@ class Prism_BlenderMHExtension_Functions(object):
 
     @err_catcher(name=__name__)
     def getSlotname(self, layername, aovname):
+        framepadding = self.core.framePadding
+        padding_string = str('#' * framepadding)
         if aovname == "Image":
             aovname = "beauty"
-        return layername + "_" + aovname + "/" + layername + "_" + aovname + "_####.exr"
+        return layername + "_" + aovname + "/" + layername + "_" + aovname + "." + padding_string + ".exr"
 
     @err_catcher(name=__name__)
     def connectNodes(self, nodetree, layername, renderpass, out_node)->None:
@@ -676,7 +678,9 @@ class Prism_BlenderMHExtension_Functions(object):
     # !CallFromMHRendLayer
     @err_catcher(name=__name__)
     def setOutputsPaths(self, layername, basepath):
-        nodetree = bpy.context.scene.node_tree
+        nodetree = bpy.context.scene.node_tree        
+        framepadding = self.core.framePadding
+        padding_string = str('#' * framepadding)
         layernodesdict:dict = self.getLayerOutNodes(layername)
         for key, value in layernodesdict.items():
             node = value
@@ -684,7 +688,7 @@ class Prism_BlenderMHExtension_Functions(object):
                 # Remove the AOV beauty from the base path
                 allpath = os.path.dirname(os.path.normpath(basepath + "\\"))
                 if key == 'crypto':
-                    allpath = os.path.normpath(os.path.join(allpath, layername + "_Cryptomatte", layername + "_CryptoMatte_####.exr"))
+                    allpath = os.path.normpath(os.path.join(allpath, layername + "_Cryptomatte", layername + "_CryptoMatte." + padding_string + ".exr"))
 
                 node.base_path = allpath
 
