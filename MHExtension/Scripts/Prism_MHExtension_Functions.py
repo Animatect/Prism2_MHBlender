@@ -1,8 +1,4 @@
-# Blender Extension for internal use in Magic Hammer Studios
-
-name = "MHBlenderExtension"
-classname = "MHBlenderExtension"
-
+# Blender Extension for internal use at Magic Hammer Studios
 
 import os
 import sys
@@ -16,6 +12,8 @@ from qtpy.QtWidgets import *
 
 from PrismUtils.Decorators import err_catcher
 
+import Prism_MHExtension_SettingsUI as sui
+
 logger = logging.getLogger(__name__)
 
 dirnm = os.path.dirname(__file__)
@@ -25,18 +23,30 @@ for extra_path in extra_paths:
         sys.path.append(extra_path)
 
 
-class MHBlenderExtension:
-    def __init__(self, core):
+class Prism_MHExtension_Functions(object):
+    def __init__(self, core, plugin):
         self.core = core
-        self.version = "v0.0.1"
-        self.functions = None
+        self.plugin = plugin
+        self.blendFunctions = None
         self.monkeypatchedsm = None
         self.customstates = ["bld_MHRender", "bld_MHrendLayer"]
         self.isMHrendClass = False
-                
+        
+        #   Callbacks
+        logger.debug("Loading callbacks")
+        self.core.registerCallback("userSettings_loadUI", self.onUserSettings_loadUI, plugin=self)
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
 
+    # if returns true, the plugin will be loaded by Prism
+    @err_catcher(name=__name__)
+    def isActive(self):
+        return True
+    
+    @err_catcher(name=__name__)
+    def onUserSettings_loadUI(self, origin):
+        sui.userSettings_loadUI(self, origin)
+    
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
         for customstate in self.customstates:
@@ -51,10 +61,10 @@ class MHBlenderExtension:
                 
     @err_catcher(name=__name__)
     def onPluginLoaded(self, plugin):
-        if not self.functions:
+        if not self.blendFunctions:
             if self.core.appPlugin.appShortName.lower() == "bld":
                 import Prism_BlenderMHExtension_Functions
-                self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
+                self.blendFunctions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
                 self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
                 
@@ -81,7 +91,7 @@ class MHBlenderExtension:
                 self.core.popup("Object not visible in viewport at the moment")
             else:
                 self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_export_exportShotcam, origin, startFrame, endFrame, outputName)
-                self.functions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
+                self.blendFunctions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
         # print("is monkeypatched: ", "\norigin: ", origin, "\nstartFrame: ", startFrame, ", endFrame: ", endFrame, "\noutputName: ", outputName, "\n#######\n")
 
     @err_catcher(name=__name__)
