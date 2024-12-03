@@ -59,7 +59,7 @@ class MHRenderClass(object):
 		self.allowCustomContext = False
 		self.cb_context.addItems(["From scenefile", "Custom"])
 		
-		self.pluginMHfunctions = self.core.getPlugin("MHBlenderExtension").functions
+		self.pluginMHfunctions = self.core.getPlugin("MHExtension").blendFunctions
 
 		self.curCam = None
 		self.renderingStarted = False

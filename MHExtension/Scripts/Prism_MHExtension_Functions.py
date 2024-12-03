@@ -1,8 +1,4 @@
-# Blender Extension for internal use in Magic Hammer Studios
-
-name = "MHBlenderExtension"
-classname = "MHBlenderExtension"
-
+# Blender Extension for internal use at Magic Hammer Studios
 
 import os
 import sys
@@ -16,6 +12,8 @@ from qtpy.QtWidgets import *
 
 from PrismUtils.Decorators import err_catcher
 
+from Prism_MHExtension_Integration import Prism_MHExtension_Integration
+
 logger = logging.getLogger(__name__)
 
 dirnm = os.path.dirname(__file__)
@@ -25,18 +23,34 @@ for extra_path in extra_paths:
         sys.path.append(extra_path)
 
 
-class MHBlenderExtension:
-    def __init__(self, core):
+class Prism_MHExtension_Functions(object):
+    def __init__(self, core, plugin):
         self.core = core
-        self.version = "v0.0.1"
-        self.functions = None
+        self.plugin = plugin
+        self.blendFunctions = None
+        self.fusFunctions = None
         self.monkeypatchedsm = None
         self.customstates = ["bld_MHRender", "bld_MHrendLayer"]
         self.isMHrendClass = False
-                
+        
+        #   Callbacks
+        logger.debug("Loading callbacks")
+        self.core.registerCallback("userSettings_loadUI", self.onUserSettings_loadUI, plugin=self)
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
+        
+        self.core.registerCallback("userSettings_saveSettings",self.userSettings_saveSettings,plugin=self.plugin,)
+        self.core.registerCallback("userSettings_loadSettings",self.userSettings_loadSettings,plugin=self.plugin,)
 
+    # if returns true, the plugin will be loaded by Prism
+    @err_catcher(name=__name__)
+    def isActive(self):
+        return True
+    
+    @err_catcher(name=__name__)
+    def onUserSettings_loadUI(self, origin):
+        self.userSettings_loadUI(origin)
+    
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
         for customstate in self.customstates:
@@ -48,15 +62,23 @@ class MHBlenderExtension:
                 self.core.plugins.monkeyPatch(self.core.appPlugin.sm_playblast_createPlayblast, self.sm_playblast_createPlayblast, self, force=True)
                 #
                 self.stateTypeCreator(customstate, origin)
+            
+            if self.core.appPlugin.appShortName.lower() == "fus":
+                pass
+                # self.core.plugins.monkeyPatch(self.core.appPlugin.sm_import_importToApp, self.on_sm_import_importToApp, self, force=True)
                 
     @err_catcher(name=__name__)
     def onPluginLoaded(self, plugin):
-        if not self.functions:
+        if not self.blendFunctions:
             if self.core.appPlugin.appShortName.lower() == "bld":
                 import Prism_BlenderMHExtension_Functions
-                self.functions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
+                self.blendFunctions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
                 self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
+        if not self.fusFunctions:
+            if self.core.appPlugin.appShortName.lower() == "fus":
+                import Prism_FusionMHExtension_Functions
+                self.fusFunctions = Prism_FusionMHExtension_Functions.Prism_FusionMHExtension_Functions(self.core, self.core.appPlugin)
                 
     @err_catcher(name=__name__)
     def is_object_excluded_from_view_layer(self, obj):
@@ -81,7 +103,7 @@ class MHBlenderExtension:
                 self.core.popup("Object not visible in viewport at the moment")
             else:
                 self.core.plugins.callUnpatchedFunction(self.core.appPlugin.sm_export_exportShotcam, origin, startFrame, endFrame, outputName)
-                self.functions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
+                self.blendFunctions.sm_export_exportBlenderShotcam(origin, startFrame, endFrame, outputName, self.core.appPlugin)
         # print("is monkeypatched: ", "\norigin: ", origin, "\nstartFrame: ", startFrame, ", endFrame: ", endFrame, "\noutputName: ", outputName, "\n#######\n")
 
     @err_catcher(name=__name__)
@@ -287,6 +309,12 @@ class %s(QWidget, %s.%s, %s.%sClass):
             context["product"] = context["product"].split("\\")[0]
 
         return context
+    
+    # @err_catcher(name=__name__)
+    # def on_sm_import_importToApp(self, origin, doImport, update, impFileName):
+    #     print("importing to app")
+    #     self.fusFunctions.sm_import_importToApp(origin, doImport, update, impFileName)
+        
     
     @err_catcher(name=__name__)
     def sm_playblast_createPlayblast(self, origin, jobFrames, outputName):
