@@ -49,8 +49,14 @@
 
 from Prism_MHExtension_Variables import Prism_MHExtension_Variables
 from Prism_MHExtension_Functions import Prism_MHExtension_Functions
+from Prism_MHExtension_Integration import Prism_MHExtension_Integration
 
-class Prism_MHExtension(Prism_MHExtension_Variables, Prism_MHExtension_Functions):
+class Prism_MHExtension(
+    Prism_MHExtension_Variables, 
+    Prism_MHExtension_Functions,
+    Prism_MHExtension_Integration,    
+):
     def __init__(self, core):
         Prism_MHExtension_Variables.__init__(self, core, self)
         Prism_MHExtension_Functions.__init__(self, core, self)
+        Prism_MHExtension_Integration.__init__(self, core, self)

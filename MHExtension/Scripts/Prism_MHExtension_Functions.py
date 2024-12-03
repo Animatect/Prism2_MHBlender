@@ -12,7 +12,7 @@ from qtpy.QtWidgets import *
 
 from PrismUtils.Decorators import err_catcher
 
-import Prism_MHExtension_SettingsUI as sui
+from Prism_MHExtension_Integration import Prism_MHExtension_Integration
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class Prism_MHExtension_Functions(object):
         self.core = core
         self.plugin = plugin
         self.blendFunctions = None
+        self.fusFunctions = None
         self.monkeypatchedsm = None
         self.customstates = ["bld_MHRender", "bld_MHrendLayer"]
         self.isMHrendClass = False
@@ -37,6 +38,9 @@ class Prism_MHExtension_Functions(object):
         self.core.registerCallback("userSettings_loadUI", self.onUserSettings_loadUI, plugin=self)
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
+        
+        self.core.registerCallback("userSettings_saveSettings",self.userSettings_saveSettings,plugin=self.plugin,)
+        self.core.registerCallback("userSettings_loadSettings",self.userSettings_loadSettings,plugin=self.plugin,)
 
     # if returns true, the plugin will be loaded by Prism
     @err_catcher(name=__name__)
@@ -45,7 +49,7 @@ class Prism_MHExtension_Functions(object):
     
     @err_catcher(name=__name__)
     def onUserSettings_loadUI(self, origin):
-        sui.userSettings_loadUI(self, origin)
+        self.userSettings_loadUI(origin)
     
     @err_catcher(name=__name__)
     def onStateManagerOpen(self, origin):
@@ -58,6 +62,10 @@ class Prism_MHExtension_Functions(object):
                 self.core.plugins.monkeyPatch(self.core.appPlugin.sm_playblast_createPlayblast, self.sm_playblast_createPlayblast, self, force=True)
                 #
                 self.stateTypeCreator(customstate, origin)
+            
+            if self.core.appPlugin.appShortName.lower() == "fus":
+                pass
+                # self.core.plugins.monkeyPatch(self.core.appPlugin.sm_import_importToApp, self.on_sm_import_importToApp, self, force=True)
                 
     @err_catcher(name=__name__)
     def onPluginLoaded(self, plugin):
@@ -67,6 +75,10 @@ class Prism_MHExtension_Functions(object):
                 self.blendFunctions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
                 self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
+        if not self.fusFunctions:
+            if self.core.appPlugin.appShortName.lower() == "fus":
+                import Prism_FusionMHExtension_Functions
+                self.fusFunctions = Prism_FusionMHExtension_Functions.Prism_FusionMHExtension_Functions(self.core, self.core.appPlugin)
                 
     @err_catcher(name=__name__)
     def is_object_excluded_from_view_layer(self, obj):
@@ -297,6 +309,12 @@ class %s(QWidget, %s.%s, %s.%sClass):
             context["product"] = context["product"].split("\\")[0]
 
         return context
+    
+    # @err_catcher(name=__name__)
+    # def on_sm_import_importToApp(self, origin, doImport, update, impFileName):
+    #     print("importing to app")
+    #     self.fusFunctions.sm_import_importToApp(origin, doImport, update, impFileName)
+        
     
     @err_catcher(name=__name__)
     def sm_playblast_createPlayblast(self, origin, jobFrames, outputName):
