@@ -219,7 +219,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
                             outPath = outPath[0]
                             if "rend" in parentState.ui.className.lower():
                                 existingVersions = self.core.mediaProducts.getVersionsFromSameVersionStack(
-                                    outPath
+                                    outPath, mediaType="3drenders"
                                 )
                             elif "playblast" in parentState.ui.className.lower():
                                 existingVersions = sm.core.mediaProducts.getVersionsFromSameVersionStack(
@@ -227,7 +227,7 @@ class %s(QWidget, %s.%s, %s.%sClass):
                                 )
                             else:
                                 existingVersions = sm.core.products.getVersionsFromSameVersionStack(
-                                    outPath
+                                    outPath, mediaType="3drenders"
                                 )
                             
                             if parentState.ui.className == "MHRender":
