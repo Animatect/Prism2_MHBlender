@@ -64,8 +64,9 @@ class Prism_MHExtension_Functions(object):
                 self.stateTypeCreator(customstate, origin)
             
             if self.core.appPlugin.appShortName.lower() == "fus":
-                pass
-                # self.core.plugins.monkeyPatch(self.core.appPlugin.sm_import_importToApp, self.on_sm_import_importToApp, self, force=True)
+                if self.fusFunctions:
+                    self.fusFunctions.sm_extendFusionPlugin(origin)
+                    self.core.plugins.monkeyPatch(self.core.appPlugin.shotCam, self.fusFunctions.shotCam, self, force=True)
                 
     @err_catcher(name=__name__)
     def onPluginLoaded(self, plugin):

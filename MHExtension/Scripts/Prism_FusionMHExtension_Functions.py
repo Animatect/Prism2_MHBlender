@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import types
 
 from qtpy.QtCore import *
 from qtpy.QtGui import *
@@ -23,103 +24,93 @@ class Prism_FusionMHExtension_Functions(object):
 		self.plugin = plugin
 		self.appplugin = self.core.appPlugin
 
+		# Dynamically add importBlenderCam as a method to self.appplugin
+		self.appplugin.importBlenderCam = types.MethodType(self.importBlenderCam, self.core.appPlugin)
+
 	@err_catcher(name=__name__)
-	def sm_import_importToApp(self, origin, doImport, update, impFileName):
-		# Check if a .bcam file exists, if so, prefer it over the abc, this means a Mh blender camera.
-		plugin = self.appplugin
-		root, _ = os.path.splitext(impFileName)
-		isbcam = False
-		new_file_path = os.path.normpath(root + '.bcam')
-		if os.path.exists(new_file_path):
-			isbcam = True
-			impFileName = new_file_path
-		
-		comp = plugin.getCurrentComp()
+	def sm_extendFusionPlugin(self, origin):
+		if self.appplugin.legacyImportHandlers:
+			legacyImportHandlers:dict = self.appplugin.legacyImportHandlers
+			if not legacyImportHandlers.get(".bcam"):
+				legacyImportHandlers[".bcam"] = {"importFunction": self.importBlenderCam}
+	
+
+	@err_catcher(name=__name__)
+	def importBlenderCam(self, Filepath, origin) -> bool:
+		comp = self.appplugin.getCurrentComp()
 		flow = comp.CurrentFrame.FlowView
-		fileName = os.path.splitext(os.path.basename(impFileName))
-		origin.setName = ""
-		result = False
-		# Check that we are not importing in a comp different than the one we started the stateManager from
-		if plugin.sm_checkCorrectComp(comp):
-			#try to get an active tool to set a ref position
-			activetool = None
-			try:
-				activetool = comp.ActiveTool()
-			except:
-				pass
-			if activetool and not activetool.GetAttrs("TOOLS_RegID") =="BezierSpline":
-				atx, aty = flow.GetPosTable(activetool).values()
-			else:
-				atx, aty = plugin.find_LastClickPosition()
+
+		from MH_BlenderCam_Fusion_Importer import BlenderCameraImporter
+		BcamImporter = BlenderCameraImporter()
+		
+		#   Deselect All
+		flow.Select()
+
+		BcamImporter.import_blender_camera(Filepath)
+		if len(comp.GetToolList(True)) > 0:
+			return True
+		else:
+			return False
+		
+	#	This imports shotcams as a legacy
+	@err_catcher(name=__name__)
+	def shotCam(self):
+		logger.debug("Loading state manager patched function: 'shotCam', patched by the MHExtension.")
+		if self.appplugin.sm_checkCorrectComp(self.appplugin.getCurrentComp()):
+			sm = self.appplugin.MP_stateManager
+
+		sm.saveEnabled = False
+		for i in sm.states:
+			if i.ui.className == "Legacy3D_Import" and i.ui.taskName == "ShotCam":
+				mCamState = i.ui
+				camState = i
+
+		if "mCamState" in locals():
+			mCamState.importLatest()
+			sm.selectState(camState)
+		else:
+			fileName = sm.core.getCurrentFileName()
+			fnameData = sm.core.getScenefileData(fileName)
+			if not (
+				os.path.exists(fileName)
+				and sm.core.fileInPipeline(fileName)
+			):
+				sm.core.showFileNotInProjectWarning(title="Warning")
+				sm.saveEnabled = True
+				return False
+
+			if fnameData.get("type") != "shot":
+				msgStr = "Shotcams are not supported for assets."
+				sm.core.popup(msgStr)
+				sm.saveEnabled = True
+				return False
+
+			if sm.core.getConfig("globals", "productTasks", config="project"):
+				fnameData["department"] = os.getenv("PRISM_SHOTCAM_DEPARTMENT", "Layout")
+				fnameData["task"] = os.getenv("PRISM_SHOTCAM_TASK", "Cameras")
+
+			filepath = sm.core.products.getLatestVersionpathFromProduct(
+				"_ShotCam", entity=fnameData
+			)
 			
-			#get Extension
-			ext = fileName[1].lower()
-
-			#if extension is supported
-			if ext in plugin.importHandlers:
-				# Do the importing
-				result = plugin.importHandlers[ext]["importFunction"](impFileName, origin)
-			else:
-				plugin.core.popup("Format is not supported.")
-				return {"result": False, "doImport": doImport}
-
-			#After import update the stateManager interface
-			if result:
-				#check if there was a merge3D in the import and where was it connected to
-				newNodes = [n.Name for n in comp.GetToolList(True).values()]
-				if isbcam:
-					importedNodes = []
-					importedNodes.append(plugin.getNode(newNodes[0]))
-					origin.setName = "Import_" + fileName[0]			
-					origin.nodes = importedNodes
-				else:
-					refPosNode, positionedNodes = plugin.ReplaceBeforeImport(origin, newNodes)
-					plugin.cleanbeforeImport(origin)
-					if refPosNode:
-						atx, aty = flow.GetPosTable(refPosNode).values()
+			if not filepath:
+				sm.core.popup("Could not find a shotcam for the current shot.")
+				sm.saveEnabled = True
+				return False
 			
-					importedTools = comp.GetToolList(True).values()
-					#Set the position of the imported nodes relative to the previously active tool or last click in compView
-					impnodes = [n for n in importedTools]
-					if len(impnodes) > 0:
-						comp.Lock()
+			#####
+			
+			# BlenderCam Check
+			root, _ = os.path.splitext(filepath)
+			new_file_path = os.path.normpath(root + '.bcam')
+			if os.path.exists(new_file_path):
+				filepath = new_file_path
 
-						fisrtnode = impnodes[0]
-						fstnx, fstny = flow.GetPosTable(fisrtnode).values()
+			#####
+			sm.createState("Legacy3D_Import", importPath=filepath, setActive=True)
 
-						for n in impnodes:
-							if not n.Name in positionedNodes:
-								x,y  = flow.GetPosTable(n).values()
-
-								offset = [x-fstnx,y-fstny]
-								newx = x+(atx-x)+offset[0]
-								newy = y+(aty-y)+offset[1]
-								flow.SetPos(n, newx-1, newy)
-
-						comp.Unlock()
-					##########
-
-					importedNodes = []
-					for i in newNodes:
-						# Append sufix to objNames to identify product with unique Name
-						node = plugin.getObject(i)
-						newName = plugin.applyProductSufix(i, origin)
-						node.SetAttrs({"TOOLS_Name":newName, "TOOLB_NameSet": True})
-						importedNodes.append(plugin.getNode(newName))
-
-					origin.setName = "Import_" + fileName[0]			
-					origin.nodes = importedNodes
-
-				#Deselect All
-				flow.Select()
-
-				objs = [plugin.getObject(x) for x in importedNodes]
-				
-				#select nodes in comp
-				for o in objs:
-					flow.Select(o)
-
-				#Set result to True if we have nodes
-				result = len(importedNodes) > 0
-
-		return {"result": result, "doImport": doImport}
+		sm.setListActive(sm.tw_import)
+		sm.activateWindow()
+		sm.activeList.setFocus()
+		sm.saveEnabled = True
+		sm.saveStatesToScene()
