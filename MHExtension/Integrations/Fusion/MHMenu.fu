@@ -20,6 +20,27 @@
             },
         },
     },
+    Action
+    {
+        ID = "MH_PrismLoaderShotSwitcher",
+        Category = "MH",
+        Name = "MH_Prism Loader Shot Switcher",
+
+        Targets =
+        {
+            Composition =
+            {
+                Execute = _Lua [=[
+                    local scriptPath = app:MapPath("Scripts:MH/MH_PrismShotSwitcher.py")
+                    if bmd.fileexists(scriptPath) == false then
+                        print("[Prism Error] Can't run file: " .. scriptPath)
+                    else
+                        target:RunScript(scriptPath)
+                    end
+                ]=],
+            },
+        },
+    },
     Menus
     {
         Target = "ChildFrame",
@@ -29,6 +50,7 @@
             Sub "MH"
             {
                 "BlenderOCIO_Node{}",
+                "MH_PrismLoaderShotSwitcher{}"
             },
         },
     },
