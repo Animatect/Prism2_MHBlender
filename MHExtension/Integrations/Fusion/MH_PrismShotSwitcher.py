@@ -117,22 +117,18 @@ class MyWindow(QWidget):
 		self.refreshAsset()
 
 	def getPreviewImage(self, load=True):
-		# if getattr(self, "validPreview", None):
-		# 	pixmap = self.core.media.scalePixmap(self.validPreview, self.l_preview.width(), self.previewHeight, keepRatio=True, fitIntoBounds=False, crop=True)
-		# 	return pixmap
-
 		image = None
 		if load:
 			configPath = self.core.getUserPrefConfigPath()
 			prpath = self.core.projectPath
-			print("PROY: ", prpath)
+			# print("PROY: ", prpath)
 			# print(configPath)
 			if os.path.isfile(configPath):
 				image = self.core.projects.getProjectImage(
 					projectPath = self.core.projectPath
 					# projectConfig = configPath
 				)
-				print("image: ", image)
+				# print("image: ", image)
 				if not image:
 					imgFile = os.path.join(
 						self.core.prismRoot,
@@ -202,76 +198,162 @@ class MyWindow(QWidget):
 	def onChangePathsClicked(self):
 		comp = fusion.CurrentComp
 		flow = comp.CurrentFrame.FlowView
-		tool = comp.ActiveTool
-		oldPath = tool.GetData('Prism_ToolData')['filepath']
-		print("oldPath: \n", oldPath)
-		context = self.core.paths.getRenderProductData(oldPath)
-		context["shot"] = self.dd_shots.currentText()
-		context["sequence"] = self.dd_sequences.currentText()
-		context["identifier"] = tool.GetData('Prism_ToolData')['mediaId']
-		context["aov"] = tool.GetData('Prism_ToolData')['aov']
-		context["extension"] = tool.GetData('Prism_ToolData')['extension']
-		context["frame"] = "0001"
-		hmv = self.core.mediaProducts.getHighestMediaVersion(context, getExisting=True)
-		context["version"] = str(hmv)
-		# print("CTX: \n", context)
+		loaders = self.getSelectedTools(comp, toolType = "Loader")
+		updatecount = 0
+		errorcount = 0
+		for tool in loaders:
+			oldPath = tool.GetData('Prism_ToolData')['filepath']
+			# print("oldPath: \n", oldPath)
+			context = self.core.paths.getRenderProductData(oldPath)
+			context["shot"] = self.dd_shots.currentText()
+			context["sequence"] = self.dd_sequences.currentText()
+			context["identifier"] = tool.GetData('Prism_ToolData')['mediaId']
+			context["aov"] = tool.GetData('Prism_ToolData')['aov']
+			context["extension"] = tool.GetData('Prism_ToolData')['extension']
+			context["frame"] = "0001"
+			hmv = self.core.mediaProducts.getHighestMediaVersion(context, getExisting=True)
+			context["version"] = str(hmv)
+			# print("CTX: \n", context)
 
-		#Blender paths fix
-		path:str = self.core.projects.getResolvedProjectStructurePath("renderFilesShots", context=context)
-		dir_path, filename = os.path.split(path)
-		new_basename = context["aov"]
-		newPath:str = ""
-		match = re.search(r"\.(\d+)\.(\w+)$", filename)
-		#New Filename for Blender MH naming convention.
-		if match:
-			frame, extension = match.groups()
-			# Build new filename and full path
-			new_filename = f"{new_basename}.{frame}.{extension}"
-			newPath = os.path.join(dir_path, new_filename)
-		else:
-			newPath =  path
-		temppath = newPath
-		#Taking buggy undercore naming into consideration.
-		if not os.path.exists(temppath):
-			# Replace the dot before frame number with underscore
-			# e.g. Something.0001.exr -> Something_0001.exr
-			temppath = re.sub(r'\.(\d+)\.(\w+)$', r'_\1.\2', temppath)
-		if os.path.exists(temppath):
-			newPath = temppath
-		
-		#Set the new name.
-		newNodeName = f"{context['sequence']}_{context['shot']}_{context['identifier']}_{context['aov']}_{context['version']}"
-		tool.SetAttrs({"TOOLS_Name": newNodeName})
+			#Blender paths fix
+			path:str = self.core.projects.getResolvedProjectStructurePath("renderFilesShots", context=context)
+			dir_path, filename = os.path.split(path)
+			new_basename = context["aov"]
+			newPath:str = ""
+			match = re.search(r"\.(\d+)\.(\w+)$", filename)
+			#New Filename for Blender MH naming convention.
+			if match:
+				frame, extension = match.groups()
+				# Build new filename and full path
+				new_filename = f"{new_basename}.{frame}.{extension}"
+				newPath = os.path.join(dir_path, new_filename)
+			else:
+				newPath =  path
+			temppath = newPath
+			#Taking buggy undercore naming into consideration.
+			if not os.path.exists(temppath):
+				# Replace the dot before frame number with underscore
+				# e.g. Something.0001.exr -> Something_0001.exr
+				temppath = re.sub(r'\.(\d+)\.(\w+)$', r'_\1.\2', temppath)
+			if os.path.exists(temppath):
+				newPath = temppath
+			
+			##############################
+			#			SET IT			 #
+			##############################
+			if os.path.exists(newPath):
+				#Set the new name.
+				newNodeName = f"{context['sequence']}_{context['shot']}_{context['identifier']}_{context['aov']}_{context['version']}"
+				tool.SetAttrs({"TOOLS_Name": newNodeName})
 
-		#Assign the new path
-		tool.Clip = newPath
+				#Assign the new path
+				tool.Clip = newPath
 
-		#Correct the prism data:
-		newdata:dict = tool.GetData('Prism_ToolData').copy()
-		newdata["nodeName"] = newNodeName
-		newdata["version"] = context["version"]
-		newdata["filepath"] = newPath
-		newdata["sequence"] = context["sequence"]
-		newdata["shot"] = context["shot"]
+				#Correct the prism data:
+				newdata:dict = tool.GetData('Prism_ToolData').copy()
+				newdata["nodeName"] = newNodeName
+				newdata["version"] = context["version"]
+				newdata["filepath"] = newPath
+				newdata["sequence"] = context["sequence"]
+				newdata["shot"] = context["shot"]
 
-		tool.SetData({'Prism_ToolData': newdata})
-		
-		if not os.path.isfile(newPath):
-			tool.TileColor = { 'R': 1.0, 'G': 0.0, 'B': 0.0 }
-			pos = flow.GetPosTable(tool)
-			flow.SetPos(tool, pos[1]-0.5, pos[2])
-		
+				tool.SetData({'Prism_ToolData': newdata})
 
-		print( "newPath: \n", newPath )
+				#Start and end duration#
+				startfr, endfr = self.getStartFrAndDuration(newPath)
 
+				tool.GlobalOut[0] = endfr
+				tool.GlobalIn[0] = startfr
+
+				tool.ClipTimeStart = 0
+				tool.ClipTimeEnd = endfr - startfr
+
+				tool.HoldFirstFrame = 0
+				tool.HoldLastFrame = 0
+
+				updatecount += 1
+			
+			else:
+				tool.TileColor = { 'R': 1.0, 'G': 0.0, 'B': 0.0 }
+				pos = flow.GetPosTable(tool)
+				flow.SetPos(tool, pos[1]-0.5, pos[2])
+				errorcount += 1
+						
+		self.popup(f"{updatecount} loaders paths found and updated.\n{errorcount} loaders errored out and were not modified.")
+
+	
+	def popup(self, msg:str):
+		msg_box = QMessageBox(self)
+		msg_box.setWindowTitle("Info")
+		msg_box.setText(msg)
+		msg_box.setIcon(QMessageBox.Information)  # Can be Information, Warning, Critical, etc.
+		msg_box.setStandardButtons(QMessageBox.Ok)
+
+		# Show the message box
+		msg_box.exec()
+
+	def getSelectedTools(self, comp, toolType:str=None) -> list:
+		toolList = []
+		for tool in comp.GetToolList(True).values():
+			if toolType:
+				if tool.GetAttrs("TOOLS_RegID") == toolType:
+					toolList.append(tool)
+			else:
+				toolList.append(tool)
+
+		return toolList
 	def onProjectChanged(self, core):
 		# curPrj = core.getConfig("globals", "current project")
 		prstr = core.projects.getProjectStructure()
 		# print(curPrj)
-		print("prch")
+		# print("prch")
 		print(core.projectPath)
 		self.updatePreview()
 		self.refreshAsset()
+
+	def getStartFrAndDuration(self, baseFile):
+		versionDir = os.path.dirname(baseFile)
+		sources = self.core.media.getImgSources(versionDir, getFirstFile=True)
+
+		# source = sources[0]
+		sourcePath = os.path.join(versionDir, baseFile)
+		if not os.path.isdir(sourcePath):
+			sourceDir = os.path.dirname(sourcePath)
+		else:
+			sourceDir = sourcePath
+
+		seqName, seqFiles = self.getSequenceData(sourceDir)
+		startfr = self.core.media.getFrameRangeFromSequence(seqFiles, baseFile=baseFile)
+
+		return startfr
+
+	def getSequenceData(self, sourceDir):
+		#   Handle
+		if self.getLinkedFilepath(sourceDir):
+			files = self.getLinkedFilepath(sourceDir)
+
+		else:
+			files = os.listdir(sourceDir)
+
+		#   Filter and get sequence Dict
+		validFiles = self.core.media.filterValidMediaFiles(files)
+		validFiles = sorted(validFiles, key=lambda x: x if "cryptomatte" not in os.path.basename(x) else "zzz" + x)
+
+		seqDict = self.core.media.detectSequences(validFiles)
+		seqName, seqFiles = next(iter(seqDict.items()))
+
+		return seqName, seqFiles
+	
+	def getLinkedFilepath(self, sourceDir):
+		redirectFile = os.path.join(sourceDir, "REDIRECT.txt")
+		if os.path.exists(redirectFile):
+			with open(redirectFile, "r") as rdFile:
+				files = [rdFile.read()]
+
+			return files
+		
+		else:
+			return None
 
 def prismInit():
 	pcore = PrismCore.create(app="Standalone", prismArgs=["noUI", "loadProject"])
@@ -285,15 +367,6 @@ def getIconPath():
 
 if __name__ == "__main__":
 	print("initing")
-	# core = prismInit()
-	# print(core.version)
-	# print("sequences")
-	# for s in core.entities.getSequences():
-	# 	print(s['sequence'])
-	# 	print("shots")
-	# 	for s in core.entities.getShotsFromSequence(s['sequence']):
-	# 		print("		", s['shot'])
-	# print("\n")
 	qapp = QApplication.instance()
 	if qapp == None:
 		qapp = QApplication(sys.argv)
