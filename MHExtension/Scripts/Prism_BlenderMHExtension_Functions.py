@@ -934,6 +934,10 @@ class Prism_BlenderMHExtension_Functions(object):
         #Focal_Length
         data['focal_length'] = self.getrfocallendic(obj, scene, frame_range)
 
+        #Lens_Shift
+        data['shift_x'] = self.getlshiftdic(obj, scene, frame_range, 'x')
+        data['shift_y'] = self.getlshiftdic(obj, scene, frame_range, 'y')
+
         ########################        
         data['clip_start'] = obj.data.clip_start
         data['clip_end'] = obj.data.clip_end
@@ -1028,6 +1032,17 @@ class Prism_BlenderMHExtension_Functions(object):
         for f in frame_range:
             scene.frame_set(f)
             dic[str(f)] = obj.data.lens
+        return dic
+
+    @err_catcher(name=__name__)
+    def getlshiftdic(self, obj, scene, frame_range, element:str):
+        dic = {}
+        for f in frame_range:
+            scene.frame_set(f)
+            if element == 'x':            
+                dic[str(f)] = obj.data.shift_x
+            elif element == 'y':            
+                dic[str(f)] = obj.data.shift_y
         return dic
 
     def mm_to_inch(self, value: float) -> float:

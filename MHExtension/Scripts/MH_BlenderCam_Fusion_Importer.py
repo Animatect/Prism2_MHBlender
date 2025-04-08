@@ -40,9 +40,6 @@
 #                     e.covo@magichammer.com.mx
 #                     https://magichammer.com.mx
 #
-#                           Joshua Breckeen
-#                              Alta Arts
-#                          josh@alta-arts.com
 #
 ###########################################################################
 
@@ -120,24 +117,42 @@ class BlenderCameraImporter():
         ########### COPIAMOS LOS VALORES DE BLENDER ###########
         #######################################################
         frame_list = [int(i) for i in camDict["trans_z"]]
+        isanimatedFL = isinstance(camDict["focal_length"], dict)
+        isanimatedShift = isinstance(camDict["shift_x"], dict)        
         start_frame = min(frame_list)
         end_frame = max(frame_list)
         for num, frame in enumerate(range(start_frame, end_frame+1)):
             self.load_blendercamera_transformations(
                 frame, num, camNode, camDict
             )
-        if isinstance(camDict["focal_length"], dict):
-            frame_list = [int(i) for i in camDict["focal_length"]]
-            start_frame = min(frame_list)
-            end_frame = max(frame_list)
-            for num, frame in enumerate(range(start_frame, end_frame+1)):
-                comp.SetAttrs({"COMPN_CurrentTime": frame})
+            if isanimatedFL:
                 if num == 0:
                     camNode.FLength = comp.BezierSpline()
                 camNode.FLength[comp.CurrentTime] = camDict["focal_length"][str(frame)]
-        else:
-            camNode.FLength[comp.CurrentTime] = camDict["focal_length"]
+            if isanimatedShift:
+                if num == 0:
+                    camNode.LensShiftX = comp.BezierSpline()
+                    camNode.LensShiftY = comp.BezierSpline()
+                camNode.LensShiftX[comp.CurrentTime] = -camDict["shift_x"][str(frame)]
+                camNode.LensShiftY[comp.CurrentTime] = -camDict["shift_y"][str(frame)]
 
+        # if isinstance(camDict["focal_length"], dict):
+        #     frame_list = [int(i) for i in camDict["focal_length"]]
+        #     start_frame = min(frame_list)
+        #     end_frame = max(frame_list)
+        #     for num, frame in enumerate(range(start_frame, end_frame+1)):
+        #         comp.SetAttrs({"COMPN_CurrentTime": frame})
+        #         if num == 0:
+        #             camNode.FLength = comp.BezierSpline()
+        #         camNode.FLength[comp.CurrentTime] = camDict["focal_length"][str(frame)]
+        # else:
+        #     camNode.FLength[comp.CurrentTime] = camDict["focal_length"]
+        if not isanimatedFL:
+            camNode.FLength[comp.CurrentTime] = camDict["focal_length"]
+        if not isanimatedShift:
+            camNode.LensShiftX[comp.CurrentTime] = -camDict["shift_x"]
+            camNode.LensShiftY[comp.CurrentTime] = -camDict["shift_y"]
+                    
         camNode({
             "FilmGate": "User",
             "ResolutionGateFit": "Width",
