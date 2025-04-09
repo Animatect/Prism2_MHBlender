@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import uuid
+import hashlib
 
 
 def getPrismRoot():
@@ -199,6 +201,7 @@ class MyWindow(QWidget):
 		comp = fusion.CurrentComp
 		flow = comp.CurrentFrame.FlowView
 		loaders = self.getSelectedTools(comp, toolType = "Loader")
+		newStateUID = self.createUID()
 		updatecount = 0
 		errorcount = 0
 		for tool in loaders:
@@ -251,13 +254,15 @@ class MyWindow(QWidget):
 
 				#Correct the prism data:
 				newdata:dict = tool.GetData('Prism_ToolData').copy()
+				newdata["stateUID"] = newStateUID
 				newdata["nodeName"] = newNodeName
 				newdata["version"] = context["version"]
 				newdata["filepath"] = newPath
 				newdata["sequence"] = context["sequence"]
 				newdata["shot"] = context["shot"]
-
-				tool.SetData({'Prism_ToolData': newdata})
+				# print("oldData: \n", tool.GetData('Prism_ToolData'))
+				tool.SetData('Prism_ToolData', newdata)
+				# print("newData: \n", tool.GetData('Prism_ToolData'))
 
 				#Start and end duration#
 				startfr, endfr = self.getStartFrAndDuration(newPath)
@@ -354,6 +359,15 @@ class MyWindow(QWidget):
 		
 		else:
 			return None
+	
+	def createUID(self, length:int=8):
+		uid = uuid.uuid4()
+		# Create a SHA-256 hash of the UUID
+		hashObject = hashlib.sha256(uid.bytes)
+		# Convert the hash to a hex string and truncate it to the desired length
+		shortUID = hashObject.hexdigest()[:length]
+
+		return shortUID
 
 def prismInit():
 	pcore = PrismCore.create(app="Standalone", prismArgs=["noUI", "loadProject"])
