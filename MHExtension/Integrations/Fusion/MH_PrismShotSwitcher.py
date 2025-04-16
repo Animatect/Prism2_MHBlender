@@ -8,7 +8,7 @@ import hashlib
 def getPrismRoot():
 	prismRoot = os.getenv("PRISM_ROOT")
 	if not prismRoot:
-		prismRoot = "C:/Program Files/Prism2"
+		prismRoot = PRISMROOT
 	return prismRoot
 prismRoot = getPrismRoot()
 

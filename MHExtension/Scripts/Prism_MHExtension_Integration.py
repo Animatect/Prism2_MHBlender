@@ -217,6 +217,17 @@ class Prism_MHExtension_Integration(object):
 
 				shutil.copy2(origFile, targetFile)
 				addedFiles.append(targetFile)
+
+				with open(targetFile, "r") as init:
+					initStr = init.read()
+
+				with open(targetFile, "w") as init:
+					initStr = initStr.replace(
+						"PRISMROOT", '"%s"' % self.core.prismRoot.replace(
+							"\\", "/")
+					)
+					init.write(initStr)
+					
 			return True
 		except Exception as e:
 			exc_type, exc_obj, exc_tb = sys.exc_info()
