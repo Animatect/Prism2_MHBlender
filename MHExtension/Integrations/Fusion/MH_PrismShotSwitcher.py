@@ -391,3 +391,12 @@ if __name__ == "__main__":
 		window = MyWindow(core)
 		window.show()
 	qapp.exec_()
+
+	# WirelessNode.Input.ConnectTo(AutoDomainNode)
+	# AutoDomainNodeName = WirelessNode.Input.GetConnectedOutput().GetTool().Name
+	# 'TOOLS_RegID': 'Fuse.Wireless'
+	# comp.AddTool("Fuse.Wireless")
+
+
+	# Composition.MapPath(path)
+	# Composition.ReverseMapPath(mapped)

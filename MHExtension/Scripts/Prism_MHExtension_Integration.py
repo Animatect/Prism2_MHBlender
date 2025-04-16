@@ -19,9 +19,15 @@ class Prism_MHExtension_Integration(object):
 		self.plugin = plugin
 		self.scripts = [
 			"BlenderOCIOmanager.py",
+			"MH_AbsoluteToPathMaps.py",
+			"MH_PathMapsToAbsolute.py",
+			"MH_PrismShotSwitcher.py",
 		]
 		self.configs = [
 			"MHMenu.fu",
+		]		
+		self.presetprj = [
+			"CGNOVADefault",
 		]
 
 	@err_catcher(name=__name__)
@@ -94,6 +100,37 @@ class Prism_MHExtension_Integration(object):
 		lo_FusionConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
 		lo_MHExtension.addWidget(self.gb_FusionConfig, alignment=Qt.AlignTop)  # Add group box with alignment
+		
+		#############################################
+		# ADD Presets
+		# PPRESETS CONFIG GROUP BOX
+		self.gb_PresetsConfig = QGroupBox()
+		self.gb_PresetsConfig.setTitle("Presets Configuration")  # Add a title for clarity
+		lo_PresetsConfig = QVBoxLayout(self.gb_PresetsConfig)
+		lo_PresetsConfig.setSpacing(5)  # Reduce spacing between elements in the group box
+		lo_PresetsConfig.setContentsMargins(10, 10, 10, 10)  # Add consistent margins
+
+		# Button Section
+		lo_presetsButtonRow = QHBoxLayout()  # Create a horizontal layout for the buttons
+		# lo_presetsButtonRow.addStretch()  # Add a stretchable space to push buttons to the right
+
+		self.but_presetsAdd = QPushButton("Add")
+		self.but_presetsAdd.clicked.connect(self.addPresets)
+		self.but_presetsAdd.setToolTip("Click to add MH Preferences.")
+		lo_presetsButtonRow.addWidget(self.but_presetsAdd)
+
+		self.but_presetsOpen = QPushButton("Open Presets Folder")
+		self.but_presetsOpen.clicked.connect(self.OpenPresets)
+		self.but_presetsOpen.setToolTip("Click to add MH Preferences.")
+		lo_presetsButtonRow.addWidget(self.but_presetsOpen)
+
+		lo_presetsButtonRow.addStretch()  # Add a stretchable space to push buttons to the right
+		
+		lo_PresetsConfig.addLayout(lo_presetsButtonRow)  # Add the button layout to the group box layout
+		lo_MHExtension.addWidget(self.gb_PresetsConfig, alignment=Qt.AlignTop)  # Add group box with alignment
+
+
+		############################################
 
 		# ADD MENU ENTRY TO SETTINGS UI
 		origin.addTab(origin.w_MHExtension, "MH Prism Extension")
@@ -232,6 +269,34 @@ class Prism_MHExtension_Integration(object):
 			QMessageBox.warning(self.core.messageParent,
 								"Prism Integration", msgStr)
 			return False
+
+	@err_catcher(name=__name__)
+	def addPresets(self):
+		# PresetProjects
+		msj = "PresetProjects: \n"
+		integrationBase = os.path.join(
+			os.path.dirname(os.path.dirname(__file__)), "Integrations", "Presets", "Projects"
+		)
+		baseTargetDir = os.path.join(os.path.dirname(self.core.getUserPrefConfigPath()), "Presets", "Projects")
+		for i in self.presetprj:
+			targetDir = os.path.join(baseTargetDir, i)
+			if not os.path.exists(os.path.dirname(baseTargetDir)):
+				os.makedirs(os.path.dirname(baseTargetDir))
+
+			if os.path.exists(targetDir):
+				os.remove(targetDir)
+
+			shutil.copytree(os.path.join(integrationBase, i), targetDir)
+			msj += i +"\n"
+		msj += f"\nWere installed at:\n{baseTargetDir}"
+		self.core.popup(msj, title="Preset Projects Instalation", severity="info")
+
+		return True
+
+	@err_catcher(name=__name__)
+	def OpenPresets(self):
+		baseTargetDir = os.path.join(os.path.dirname(self.core.getUserPrefConfigPath()), "Presets")
+		os.startfile(baseTargetDir)
 
 	@err_catcher(name=__name__)
 	def userSettings_saveSettings(self, origin, settings):

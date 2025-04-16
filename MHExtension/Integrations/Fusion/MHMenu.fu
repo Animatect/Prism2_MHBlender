@@ -41,6 +41,48 @@
             },
         },
     },
+    Action
+    {
+        ID = "MH_PathMapsToAbsolute",
+        Category = "MH",
+        Name = "MH_Prism PathMaps -> AbsolutePaths",
+
+        Targets =
+        {
+            Composition =
+            {
+                Execute = _Lua [=[
+                    local scriptPath = app:MapPath("Scripts:MH/MH_PathMapsToAbsolute.py")
+                    if bmd.fileexists(scriptPath) == false then
+                        print("[Prism Error] Can't run file: " .. scriptPath)
+                    else
+                        target:RunScript(scriptPath)
+                    end
+                ]=],
+            },
+        },
+    },
+    Action
+    {
+        ID = "MH_AbsoluteToPathMaps",
+        Category = "MH",
+        Name = "MH_Prism AbsolutePaths -> PathMaps",
+
+        Targets =
+        {
+            Composition =
+            {
+                Execute = _Lua [=[
+                    local scriptPath = app:MapPath("Scripts:MH/MH_AbsoluteToPathMaps.py")
+                    if bmd.fileexists(scriptPath) == false then
+                        print("[Prism Error] Can't run file: " .. scriptPath)
+                    else
+                        target:RunScript(scriptPath)
+                    end
+                ]=],
+            },
+        },
+    },
     Menus
     {
         Target = "ChildFrame",
@@ -50,7 +92,10 @@
             Sub "MH"
             {
                 "BlenderOCIO_Node{}",
-                "MH_PrismLoaderShotSwitcher{}"
+                "MH_PrismLoaderShotSwitcher{}",
+                "_",
+                "MH_PathMapsToAbsolute{}",
+                "MH_AbsoluteToPathMaps{}",
             },
         },
     },
