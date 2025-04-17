@@ -226,6 +226,12 @@ class Prism_MHExtension_Integration(object):
 						"PRISMROOT", '"%s"' % self.core.prismRoot.replace(
 							"\\", "/")
 					)
+					plugins = self.core.plugins.getPlugins()
+					if plugins["App"].get("Fusion"):
+						initStr = initStr.replace(
+							"FUSIONROOT", '"%s"' % os.path.dirname(plugins["App"]["Fusion"].pluginPath).replace(
+								"\\", "/")
+					)
 					init.write(initStr)
 					
 			return True

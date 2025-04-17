@@ -27,4 +27,8 @@ def prismInit():
 
 core = prismInit()
 
-print(core.getUserPrefConfigPath())
+# print(core.getUserPrefConfigPath())
+plugins = core.plugins.getPlugins()
+if plugins["App"].get("Fusion"):
+	print(plugins["App"]["Fusion"].pluginPath)
+# print(core.getPluginData("Fusion"))
