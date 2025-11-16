@@ -77,7 +77,7 @@ class Prism_BlenderMHExtension_Functions(object):
         }
 
         self.core.registerCallback("onStateDeleted", self.onStateDeleted, plugin=self)
-    
+
     @err_catcher(name=__name__)
     def isUsingCycles(self)->bool:
         return bpy.context.scene.render.engine == 'CYCLES'
@@ -94,7 +94,7 @@ class Prism_BlenderMHExtension_Functions(object):
     @err_catcher(name=__name__)
     def startup(self):
         pass
-        
+
     # Create a new view layer
     @err_catcher(name=__name__)
     def createViewLayer(self, layername):

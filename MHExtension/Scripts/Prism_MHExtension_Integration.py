@@ -131,6 +131,57 @@ class Prism_MHExtension_Integration(object):
 
 
 		############################################
+		# ADD Blender Integration
+		# BLENDER CONFIG GROUP BOX
+		blenderExamplePath = os.path.join(
+			os.environ["appdata"], "Blender Foundation", "Blender"
+		)
+		self.gb_BlenderConfig = QGroupBox()
+		self.gb_BlenderConfig.setTitle("Blender Configuration")
+		lo_BlenderConfig = QVBoxLayout(self.gb_BlenderConfig)
+		lo_BlenderConfig.setSpacing(5)
+		lo_BlenderConfig.setContentsMargins(10, 10, 10, 10)
+
+		# BLENDER INSTALL DIR SECTION
+		l_BlenderInstallDir = QLabel("Blender Install Dir")
+		lo_BlenderConfig.addWidget(l_BlenderInstallDir)
+
+		lo_BlenderDir = QHBoxLayout()
+		self.e_BlenderDir = QLineEdit()
+		lo_BlenderDir.addWidget(self.e_BlenderDir)
+		lo_BlenderConfig.addLayout(lo_BlenderDir)
+
+		l_BlenderExample = QLabel(f"             (example:  {os.path.normpath(blenderExamplePath)}\\4.5)")
+		l_BlenderExample.setStyleSheet("font-size: 8pt;")
+		lo_BlenderConfig.addWidget(l_BlenderExample)
+
+		# Add and Remove Buttons Section
+		lo_BlenderButtonRow = QHBoxLayout()
+		lo_BlenderButtonRow.addStretch()
+
+		self.but_blenderAdd = QPushButton("Add")
+		self.but_blenderAdd.clicked.connect(lambda: self.browseBlenderFiles(
+			blenderExamplePath=blenderExamplePath,
+			target=self.e_BlenderDir,
+			type="file",
+			title="Select the Blender install dir."
+		))
+		self.but_blenderAdd.setToolTip("Click to add MH Blender integration.")
+		lo_BlenderButtonRow.addWidget(self.but_blenderAdd)
+
+		self.but_blenderRemove = QPushButton("Remove")
+		self.but_blenderRemove.clicked.connect(lambda: self.onRemoveBlender(
+			installPath=os.path.normpath(self.e_BlenderDir.text()),
+			target=self.e_BlenderDir
+		))
+		self.but_blenderRemove.setToolTip("Click to remove MH Blender integration.")
+		lo_BlenderButtonRow.addWidget(self.but_blenderRemove)
+
+		lo_BlenderConfig.addLayout(lo_BlenderButtonRow)
+		lo_BlenderConfig.addItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
+		lo_MHExtension.addWidget(self.gb_BlenderConfig, alignment=Qt.AlignTop)
+
+		############################################
 
 		# ADD MENU ENTRY TO SETTINGS UI
 		origin.addTab(origin.w_MHExtension, "MH Prism Extension")
@@ -316,12 +367,138 @@ class Prism_MHExtension_Integration(object):
 		os.startfile(baseTargetDir)
 
 	@err_catcher(name=__name__)
+	def browseBlenderFiles(self, blenderExamplePath, target, type='file', title='Select File or Folder'):
+		# Check if blenderExamplePath exists
+		default_path = blenderExamplePath if os.path.exists(blenderExamplePath) else os.path.expanduser("~")
+
+		# Open a file dialog to select a directory
+		folder = QFileDialog.getExistingDirectory(
+			None,
+			"Select Blender Version Directory",
+			default_path,
+			QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+		)
+
+		# If a folder is selected, update the QLineEdit
+		if folder:
+			target.setText(folder)
+			installed = self.addBlender(folder)
+			if installed:
+				self.core.popup("Installation was successful", title="Blender MH Extension Installation", severity="info")
+			else:
+				self.core.popup("Installation Failed", title="Blender MH Extension Installation", severity="warning")
+
+	@err_catcher(name=__name__)
+	def onRemoveBlender(self, installPath, target):
+		uninstalled = self.removeBlender(installPath)
+		if uninstalled:
+			target.setText("")
+			self.core.popup("Uninstallation was successful", title="Blender MH Extension Uninstallation", severity="info")
+		else:
+			self.core.popup("Uninstallation Failed", title="Blender MH Extension Uninstallation", severity="warning")
+
+	@err_catcher(name=__name__)
+	def addBlender(self, installPath):
+		"""Install MH Blender panel to Blender startup scripts"""
+		try:
+			if not os.path.exists(installPath):
+				QMessageBox.warning(
+					self.core.messageParent,
+					"MH Integration",
+					"Invalid Blender path: %s.\nThe path doesn't exist." % installPath,
+					QMessageBox.Ok,
+				)
+				return False
+
+			# Check if this is a valid Blender config directory
+			scriptsPath = os.path.join(installPath, "scripts", "startup")
+			if not os.path.exists(scriptsPath):
+				QMessageBox.warning(
+					self.core.messageParent,
+					"MH Integration",
+					"Invalid Blender path: %s.\nCould not find scripts/startup folder." % installPath,
+					QMessageBox.Ok,
+				)
+				return False
+
+			integrationBase = os.path.join(
+				os.path.dirname(os.path.dirname(__file__)), "Integrations", "Blender"
+			)
+
+			# Target file path
+			targetFile = os.path.join(scriptsPath, "MHBlenderInit.py")
+			origFile = os.path.join(integrationBase, "MHBlenderInit.py")
+
+			# Remove existing file if present
+			if os.path.exists(targetFile):
+				os.remove(targetFile)
+
+			# Copy the file
+			shutil.copy2(origFile, targetFile)
+
+			# Read the file content
+			with open(targetFile, "r") as init:
+				initStr = init.read()
+
+			# Replace placeholders with actual paths
+			mhExtensionRoot = os.path.dirname(os.path.dirname(__file__))
+			initStr = initStr.replace(
+				"PRISMROOT", '"%s"' % self.core.prismRoot.replace("\\", "/")
+			)
+			initStr = initStr.replace(
+				"MHEXTENSIONROOT", '"%s"' % mhExtensionRoot.replace("\\", "/")
+			)
+
+			# Write back the modified content
+			with open(targetFile, "w") as init:
+				init.write(initStr)
+
+			return True
+
+		except Exception as e:
+			exc_type, exc_obj, exc_tb = sys.exc_info()
+			msgStr = (
+				"Errors occurred during the installation of the Blender MH integration.\n\n%s\n%s\n%s"
+				% (str(e), exc_type, exc_tb.tb_lineno)
+			)
+			msgStr += "\n\nRunning this application as administrator could solve this problem eventually."
+			QMessageBox.warning(self.core.messageParent, "Prism Integration", msgStr)
+			return False
+
+	@err_catcher(name=__name__)
+	def removeBlender(self, installPath):
+		"""Remove MH Blender panel from Blender startup scripts"""
+		try:
+			scriptsPath = os.path.join(installPath, "scripts", "startup")
+			targetFile = os.path.join(scriptsPath, "MHBlenderInit.py")
+
+			if os.path.exists(targetFile):
+				os.remove(targetFile)
+
+			# Also remove .pyc if it exists
+			if os.path.exists(targetFile + "c"):
+				os.remove(targetFile + "c")
+
+			return True
+
+		except Exception as e:
+			exc_type, exc_obj, exc_tb = sys.exc_info()
+			msgStr = (
+				"Errors occurred during the removal of the Blender MH integration.\n\n%s\n%s\n%s"
+				% (str(e), exc_type, exc_tb.tb_lineno)
+			)
+			msgStr += "\n\nRunning this application as administrator could solve this problem eventually."
+			QMessageBox.warning(self.core.messageParent, "Prism Integration", msgStr)
+			return False
+
+	@err_catcher(name=__name__)
 	def userSettings_saveSettings(self, origin, settings):
 		try:
 			if "MHExtension" not in settings:
 				settings["MHExtension"] = {}
 
 			settings["MHExtension"]["FusionDir"] = self.e_FusionDir.text()
+			settings["MHExtension"]["BlenderDir"] = self.e_BlenderDir.text()
 
 
 		except Exception as e:
@@ -335,6 +512,8 @@ class Prism_MHExtension_Integration(object):
 			if "MHExtension" in settings:
 				if "FusionDir" in settings["MHExtension"]:
 					self.e_FusionDir.setText(settings["MHExtension"]["FusionDir"])
+				if "BlenderDir" in settings["MHExtension"]:
+					self.e_BlenderDir.setText(settings["MHExtension"]["BlenderDir"])
 
 		except Exception as e:
 			logger.warning(f"ERROR: Failed to load user settings:\n{e}")
