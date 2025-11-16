@@ -45,6 +45,60 @@ def prismInit():
     return pcore
 
 
+class EntitySelectionDialog(QDialog):
+    """Dialog for selecting an entity (asset or shot) using EntityWidget"""
+
+    def __init__(self, core, parent=None):
+        super(EntitySelectionDialog, self).__init__(parent)
+        self.core = core
+        self.selectedData = None
+        self.setupUi()
+
+    def setupUi(self):
+        self.setWindowTitle("Select Asset or Shot")
+        self.resize(800, 600)
+
+        # Main layout
+        layout = QVBoxLayout(self)
+
+        # Import and create EntityWidget
+        import EntityWidget
+        self.w_entities = EntityWidget.EntityWidget(
+            core=self.core,
+            refresh=True,
+            mode="scenefiles",
+            pages=["Assets", "Shots"]
+        )
+        layout.addWidget(self.w_entities)
+
+        # Buttons
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addStretch()
+
+        self.btn_select = QPushButton("Select")
+        self.btn_select.clicked.connect(self.onSelect)
+        buttonLayout.addWidget(self.btn_select)
+
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self.reject)
+        buttonLayout.addWidget(self.btn_cancel)
+
+        layout.addLayout(buttonLayout)
+
+    def onSelect(self):
+        """Get the selected entity data and close the dialog"""
+        data = self.w_entities.getCurrentData(returnOne=True)
+        if data:
+            self.selectedData = data
+            self.accept()
+        else:
+            self.core.popup("Please select an asset or shot", title="No Selection")
+
+    def getSelectedData(self):
+        """Return the selected entity data"""
+        return self.selectedData
+
+
 class MH_CreateModel(bpy.types.Operator):
     """Create Model using MH pipeline"""
     bl_idname = "object.mh_create_model"
@@ -55,83 +109,142 @@ class MH_CreateModel(bpy.types.Operator):
             # Get the current scene filename
             fileName = pcore.getCurrentFileName()
 
-            if not fileName:
-                print("No scene file opened")
-                pcore.popup("Please open or save a scene file first", title="MH Create Model")
-                return {"CANCELLED"}
-
             # Check if file is in the pipeline
-            if not pcore.fileInPipeline(fileName):
-                print(f"File is not in pipeline: {fileName}")
-                pcore.popup(
-                    "This file is not in the Prism pipeline.\n\nPlease use the Project Browser to save your scene with the correct name.",
-                    title="MH Create Model"
-                )
-                return {"CANCELLED"}
+            fileInPipeline = fileName and pcore.fileInPipeline(fileName)
 
-            # Get scene file data with entity extraction from path
-            fnameData = pcore.getScenefileData(fileName, getEntityFromPath=True)
+            if not fileInPipeline:
+                # File is not in pipeline or no file opened - use EntitySelectionDialog
+                print("File is not in pipeline or no file opened. Opening Entity Selection Dialog...")
 
-            if not fnameData:
-                print("Could not get scene file data")
-                pcore.popup("Could not extract data from the scene file", title="MH Create Model")
-                return {"CANCELLED"}
+                # Open EntitySelectionDialog to select an asset or shot
+                dialog = EntitySelectionDialog(core=pcore)
+                pcore.parentWindow(dialog)
+                result = dialog.exec_()
 
-            # Get entity type
-            entityType = fnameData.get("type") or fnameData.get("entityType")
+                if result != QDialog.Accepted:
+                    print("Entity selection cancelled")
+                    return {"CANCELLED"}
 
-            if entityType == "asset":
-                # Get asset name from the path data
-                assetName = fnameData.get("asset", "Unknown")
-                assetPath = fnameData.get("asset_path", "")
+                # Get the selected entity data
+                entityData = dialog.getSelectedData()
 
-                print(f"Asset Name: {assetName}")
-                print(f"Asset Path: {assetPath}")
+                if not entityData:
+                    print("No entity selected")
+                    return {"CANCELLED"}
 
-                # Show all available data for debugging
-                print(f"Full scene data: {fnameData}")
+                print(f"Selected entity data: {entityData}")
 
-                # Extract additional useful info using extractKeysFromPath
-                template = pcore.projects.getTemplatePath("assetScenefiles")
-                pathData = pcore.projects.extractKeysFromPath(fileName, template, context=fnameData)
+                # Get entity type
+                entityType = entityData.get("type")
 
-                print(f"Extracted path data: {pathData}")
+                if entityType == "asset":
+                    assetName = os.path.basename(entityData.get("asset_path", "Unknown"))
+                    assetPath = entityData.get("asset_path", "")
 
-                # Build info message
-                msg = f"Asset Name: {assetName}"
-                if assetPath:
-                    msg += f"\nAsset Path: {assetPath}"
-                if pathData.get("department"):
-                    msg += f"\nDepartment: {pathData.get('department')}"
-                if pathData.get("task"):
-                    msg += f"\nTask: {pathData.get('task')}"
-                if pathData.get("version"):
-                    msg += f"\nVersion: {pathData.get('version')}"
+                    print(f"Asset Name: {assetName}")
+                    print(f"Asset Path: {assetPath}")
+                    print(f"Full entity data: {entityData}")
 
-                pcore.popup(msg, title="MH Create Model - Asset Info")
+                    # Build info message
+                    msg = f"Asset Name: {assetName}"
+                    if assetPath:
+                        msg += f"\nAsset Path: {assetPath}"
+                    if entityData.get("department"):
+                        msg += f"\nDepartment: {entityData.get('department')}"
+                    if entityData.get("task"):
+                        msg += f"\nTask: {entityData.get('task')}"
 
-            elif entityType == "shot":
-                shotName = fnameData.get("shot", "Unknown")
-                sequenceName = fnameData.get("sequence", "")
-                episodeName = fnameData.get("episode", "")
+                    pcore.popup(msg, title="MH Create Model - Asset Info (from Selection)")
 
-                print(f"Shot Name: {shotName}")
-                if sequenceName:
-                    print(f"Sequence: {sequenceName}")
-                if episodeName:
-                    print(f"Episode: {episodeName}")
+                elif entityType == "shot":
+                    shotName = entityData.get("shot", "Unknown")
+                    sequenceName = entityData.get("sequence", "")
+                    episodeName = entityData.get("episode", "")
 
-                msg = f"This is a shot, not an asset.\n\nShot: {shotName}"
-                if sequenceName:
-                    msg += f"\nSequence: {sequenceName}"
-                if episodeName:
-                    msg += f"\nEpisode: {episodeName}"
+                    print(f"Shot Name: {shotName}")
+                    if sequenceName:
+                        print(f"Sequence: {sequenceName}")
+                    if episodeName:
+                        print(f"Episode: {episodeName}")
 
-                pcore.popup(msg, title="MH Create Model")
+                    msg = f"This is a shot, not an asset.\n\nShot: {shotName}"
+                    if sequenceName:
+                        msg += f"\nSequence: {sequenceName}"
+                    if episodeName:
+                        msg += f"\nEpisode: {episodeName}"
+
+                    pcore.popup(msg, title="MH Create Model")
+                else:
+                    print(f"Unknown entity type: {entityType}")
+                    pcore.popup(f"Unknown entity type: {entityType}", title="MH Create Model")
 
             else:
-                print(f"Unknown entity type: {entityType}")
-                pcore.popup(f"Unknown entity type: {entityType}", title="MH Create Model")
+                # File is in the pipeline - extract from scene file
+                print(f"File is in pipeline: {fileName}")
+
+                # Get scene file data with entity extraction from path
+                fnameData = pcore.getScenefileData(fileName, getEntityFromPath=True)
+
+                if not fnameData:
+                    print("Could not get scene file data")
+                    pcore.popup("Could not extract data from the scene file", title="MH Create Model")
+                    return {"CANCELLED"}
+
+                # Get entity type
+                entityType = fnameData.get("type") or fnameData.get("entityType")
+
+                if entityType == "asset":
+                    # Get asset name from the path data
+                    assetName = fnameData.get("asset", "Unknown")
+                    assetPath = fnameData.get("asset_path", "")
+
+                    print(f"Asset Name: {assetName}")
+                    print(f"Asset Path: {assetPath}")
+
+                    # Show all available data for debugging
+                    print(f"Full scene data: {fnameData}")
+
+                    # Extract additional useful info using extractKeysFromPath
+                    template = pcore.projects.getTemplatePath("assetScenefiles")
+                    pathData = pcore.projects.extractKeysFromPath(fileName, template, context=fnameData)
+
+                    print(f"Extracted path data: {pathData}")
+
+                    # Build info message
+                    msg = f"Asset Name: {assetName}"
+                    if assetPath:
+                        msg += f"\nAsset Path: {assetPath}"
+                    if pathData.get("department"):
+                        msg += f"\nDepartment: {pathData.get('department')}"
+                    if pathData.get("task"):
+                        msg += f"\nTask: {pathData.get('task')}"
+                    if pathData.get("version"):
+                        msg += f"\nVersion: {pathData.get('version')}"
+
+                    pcore.popup(msg, title="MH Create Model - Asset Info")
+
+                elif entityType == "shot":
+                    shotName = fnameData.get("shot", "Unknown")
+                    sequenceName = fnameData.get("sequence", "")
+                    episodeName = fnameData.get("episode", "")
+
+                    print(f"Shot Name: {shotName}")
+                    if sequenceName:
+                        print(f"Sequence: {sequenceName}")
+                    if episodeName:
+                        print(f"Episode: {episodeName}")
+
+                    msg = f"This is a shot, not an asset.\n\nShot: {shotName}"
+                    if sequenceName:
+                        msg += f"\nSequence: {sequenceName}"
+                    if episodeName:
+                        msg += f"\nEpisode: {episodeName}"
+
+                    pcore.popup(msg, title="MH Create Model")
+
+                else:
+                    print(f"Unknown entity type: {entityType}")
+                    pcore.popup(f"Unknown entity type: {entityType}", title="MH Create Model")
 
         except Exception as e:
             import traceback
