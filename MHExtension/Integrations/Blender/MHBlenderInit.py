@@ -7,7 +7,9 @@
 import os
 import sys
 
+
 import bpy
+from mathutils import Matrix
 
 # Get the Prism root from environment or placeholder
 if "PRISM_ROOT" in os.environ:
@@ -271,24 +273,33 @@ class ModelCreationDialog(QDialog):
         self.l_preview.setText(previewText)
 
     def selectObjectsAndApplyTransforms(self, objects):
-        print("OBJECTS: ", objects)
-        for o in objects:
-            print("object: ", o)
-        """Deselect all, select only the given objects, and apply transforms"""
-        # Deselect all objects
-        bpy.ops.object.select_all(action='DESELECT')
 
-        # Select only the objects in our list
         for obj in objects:
-            obj.select_set(True)
+            self.freeze_transforms(obj)
+            print(f"Applied transforms to {len(objects)} object(s)")
 
-        # Set the first object as active (required for some operations)
-        if objects:
-            bpy.context.view_layer.objects.active = objects[0]
+    def freeze_transforms(self, obj):
+        mw = obj.matrix_world.copy()
 
-        # Apply transforms to all selected objects
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        print(f"Applied transforms to {len(objects)} object(s)")
+        # 1. Apply matrix to mesh data
+        if obj.type == 'MESH':
+            obj.data.transform(mw)
+            obj.data.update()
+
+        # 2. Reset object matrix
+        obj.matrix_world = Matrix.Identity(4)
+
+    def reset_transforms(self, obj): # de vuelta a ident
+        # Bake matrix_world into transforms
+        mw = obj.matrix_world.copy()
+
+        # Decompose new transforms
+        obj.location = mw.to_translation()
+        obj.rotation_euler = mw.to_euler()
+        obj.scale = mw.to_scale()
+
+        # Reset world matrix
+        obj.matrix_world = Matrix.Identity(4)
 
     def onOk(self):
         """Validate and create the model"""
