@@ -261,24 +261,83 @@ class ModelCreationDialog(QDialog):
             # Format variant number with "var" prefix and 3-digit zero padding
             parts.append(f"var{variantNumber:03d}")
 
-        if parts:
-            self.resultString = "_".join(parts)
-            selectedObjects = self.getObjects()
+        if not parts:
+            self.core.popup("Please fill in at least the Asset Name field", title="Validation Error")
+            return
 
-            print(f"Model creation string: {self.resultString}")
-            print(f"Selected objects: {[obj.name for obj in selectedObjects]}")
+        self.resultString = "_".join(parts)
+        selectedObjects = self.getObjects()
 
-            msg = f"Model will be created with prefix:\n\n{self.resultString}"
-            if selectedObjects:
-                msg += f"\n\nSelected objects ({len(selectedObjects)}):\n"
-                msg += "\n".join([f"  - {obj.name}" for obj in selectedObjects[:10]])
-                if len(selectedObjects) > 10:
-                    msg += f"\n  ... and {len(selectedObjects) - 10} more"
+        if not selectedObjects:
+            self.core.popup("Please add at least one object to the selection", title="Validation Error")
+            return
+
+        print(f"Model creation string: {self.resultString}")
+        print(f"Selected objects: {[obj.name for obj in selectedObjects]}")
+
+        # Process each object
+        try:
+            # Step 1: Check if asset null already exists, create if not
+            assetNullName = assetName
+            assetNull = bpy.data.objects.get(assetNullName)
+
+            if not assetNull:
+                # Create asset null (empty object)
+                assetNull = bpy.data.objects.new(assetNullName, None)
+                bpy.context.scene.collection.objects.link(assetNull)
+                print(f"Created asset null: {assetNullName}")
+            else:
+                print(f"Using existing asset null: {assetNullName}")
+
+            # Step 2: Create model group null (prefix without <modelName>)
+            modelGroupName = self.resultString
+            modelGroupNull = bpy.data.objects.new(modelGroupName, None)
+            bpy.context.scene.collection.objects.link(modelGroupNull)
+            print(f"Created model group null: {modelGroupName}")
+
+            # Step 3: Parent model group to asset null
+            modelGroupNull.parent = assetNull
+
+            # Step 4: Process each selected object
+            for obj in selectedObjects:
+                # Get the original object name to use as modelName
+                originalName = obj.name
+
+                # Build the new object name: prefix_modelName
+                newObjectName = f"{self.resultString}_{originalName}"
+
+                # Rename the object
+                obj.name = newObjectName
+                print(f"Renamed object: {originalName} -> {newObjectName}")
+
+                # Rename the mesh/curve data with appropriate suffix
+                if obj.type == 'MESH' and obj.data:
+                    obj.data.name = f"{newObjectName}_Mesh"
+                    print(f"Renamed mesh data to: {obj.data.name}")
+                elif obj.type == 'CURVE' and obj.data:
+                    obj.data.name = f"{newObjectName}_Curve"
+                    print(f"Renamed curve data to: {obj.data.name}")
+
+                # Parent the object to the model group null
+                obj.parent = modelGroupNull
+                print(f"Parented {newObjectName} to {modelGroupName}")
+
+            msg = f"Model created successfully!\n\n"
+            msg += f"Asset Null: {assetNullName}\n"
+            msg += f"Model Group: {modelGroupName}\n"
+            msg += f"\nProcessed {len(selectedObjects)} object(s):\n"
+            msg += "\n".join([f"  - {obj.name}" for obj in selectedObjects[:10]])
+            if len(selectedObjects) > 10:
+                msg += f"\n  ... and {len(selectedObjects) - 10} more"
 
             self.core.popup(msg, title="MH Create Model - Success")
             self.close()
-        else:
-            self.core.popup("Please fill in at least the Asset Name field", title="Validation Error")
+
+        except Exception as e:
+            import traceback
+            error_msg = f"Error creating model:\n\n{str(e)}\n\n{traceback.format_exc()}"
+            print(error_msg)
+            self.core.popup(error_msg, title="MH Create Model - Error")
 
     def getResultString(self):
         """Return the result string (without <modelName>)"""
