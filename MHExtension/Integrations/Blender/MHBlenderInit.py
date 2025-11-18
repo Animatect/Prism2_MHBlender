@@ -270,6 +270,26 @@ class ModelCreationDialog(QDialog):
 
         self.l_preview.setText(previewText)
 
+    def selectObjectsAndApplyTransforms(self, objects):
+        print("OBJECTS: ", objects)
+        for o in objects:
+            print("object: ", o)
+        """Deselect all, select only the given objects, and apply transforms"""
+        # Deselect all objects
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # Select only the objects in our list
+        for obj in objects:
+            obj.select_set(True)
+
+        # Set the first object as active (required for some operations)
+        if objects:
+            bpy.context.view_layer.objects.active = objects[0]
+
+        # Apply transforms to all selected objects
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        print(f"Applied transforms to {len(objects)} object(s)")
+
     def onOk(self):
         """Validate and create the model"""
         assetName = self.e_assetName.text().strip()
@@ -394,20 +414,10 @@ class ModelCreationDialog(QDialog):
 
             # Step 6: Reset transforms if requested
             if self.chb_resetTransforms.isChecked():
-                print("Applying/freezing transforms...")
-                for obj in selectedObjects:
-                    # Select only this object
-                    bpy.ops.object.select_all(action='DESELECT')
-                    obj.select_set(True)
-                    bpy.context.view_layer.objects.active = obj
-
-                    # Apply all transforms (location, rotation, scale)
-                    if obj.type == 'MESH':
-                        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-                        print(f"Applied transforms to: {obj.name}")
-                    elif obj.type == 'CURVE':
-                        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-                        print(f"Applied transforms to: {obj.name}")
+                objs = selectedObjects
+                print("########## selectedObjects: ", selectedObjects)
+                print("########## self.objects: ", self.objects)
+                self.selectObjectsAndApplyTransforms(objs)
 
                 # Deselect all
                 bpy.ops.object.select_all(action='DESELECT')
@@ -653,17 +663,17 @@ class MH_CreateModel(bpy.types.Operator):
                     assetName = fnameData.get("asset", "Unknown")
                     assetPath = fnameData.get("asset_path", "")
 
-                    print(f"Asset Name: {assetName}")
-                    print(f"Asset Path: {assetPath}")
+                    #print(f"Asset Name: {assetName}")
+                    #print(f"Asset Path: {assetPath}")
 
                     # Show all available data for debugging
-                    print(f"Full scene data: {fnameData}")
+                    #print(f"Full scene data: {fnameData}")
 
                     # Extract additional useful info using extractKeysFromPath
                     template = pcore.projects.getTemplatePath("assetScenefiles")
                     pathData = pcore.projects.extractKeysFromPath(fileName, template, context=fnameData)
 
-                    print(f"Extracted path data: {pathData}")
+                    #print(f"Extracted path data: {pathData}")
 
                     # Open ModelCreationDialog with the asset name
                     modelDialog = ModelCreationDialog(core=pcore, assetName=assetName)
