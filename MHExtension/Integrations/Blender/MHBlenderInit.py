@@ -208,6 +208,27 @@ class ModelCreationDialog(QDialog):
         # Initialize object list
         self.objects = []
 
+        # Add separator
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(separator2)
+
+        # Checkboxes for options
+        optionsLayout = QVBoxLayout()
+
+        self.chb_resetTransforms = QCheckBox("Reset Transforms (Apply/Freeze)")
+        self.chb_resetTransforms.setChecked(True)
+        self.chb_resetTransforms.setToolTip("Aplica/congela las transformaciones de los objetos (ubicación, rotación, escala)")
+        optionsLayout.addWidget(self.chb_resetTransforms)
+
+        self.chb_createExportState = QCheckBox("Create Export State")
+        self.chb_createExportState.setChecked(True)
+        self.chb_createExportState.setToolTip("Crea un estado de exportación en el State Manager de Prism")
+        optionsLayout.addWidget(self.chb_createExportState)
+
+        layout.addLayout(optionsLayout)
+
         # Buttons
         layout.addStretch()
         buttonLayout = QHBoxLayout()
@@ -371,11 +392,71 @@ class ModelCreationDialog(QDialog):
                             col.objects.unlink(obj)
                     print(f"Moved {newObjectName} to collection {collectionName}")
 
+            # Step 6: Reset transforms if requested
+            if self.chb_resetTransforms.isChecked():
+                print("Applying/freezing transforms...")
+                for obj in selectedObjects:
+                    # Select only this object
+                    bpy.ops.object.select_all(action='DESELECT')
+                    obj.select_set(True)
+                    bpy.context.view_layer.objects.active = obj
+
+                    # Apply all transforms (location, rotation, scale)
+                    if obj.type == 'MESH':
+                        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+                        print(f"Applied transforms to: {obj.name}")
+                    elif obj.type == 'CURVE':
+                        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+                        print(f"Applied transforms to: {obj.name}")
+
+                # Deselect all
+                bpy.ops.object.select_all(action='DESELECT')
+
+            # Step 7: Create export state if requested
+            if self.chb_createExportState.isChecked():
+                print("Creating export state...")
+                try:
+                    # Check if State Manager is available
+                    if hasattr(self.core, 'stateManager') and self.core.stateManager:
+                        sm = self.core.stateManager()
+                        if sm:
+                            # Create export state
+                            exportState = sm.createState("Export", setActive=True)
+                            if exportState:
+                                # Set the output name to the model group name
+                                if hasattr(exportState, 'e_name'):
+                                    exportState.e_name.setText(modelGroupName)
+
+                                # Add objects to the export state
+                                if hasattr(exportState, 'nodes'):
+                                    for obj in selectedObjects:
+                                        exportState.nodes.append(obj.name)
+
+                                print(f"Created export state: {modelGroupName}")
+                                msg_exportState = "\nExport state created successfully!"
+                            else:
+                                print("Failed to create export state")
+                                msg_exportState = "\nFailed to create export state"
+                        else:
+                            print("State Manager not available")
+                            msg_exportState = "\nState Manager not available"
+                    else:
+                        print("State Manager not available")
+                        msg_exportState = "\nState Manager not available"
+                except Exception as e:
+                    print(f"Error creating export state: {e}")
+                    msg_exportState = f"\nError creating export state: {e}"
+            else:
+                msg_exportState = ""
+
             msg = f"Model created successfully!\n\n"
             msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
             msg += f"Model Group: {modelGroupName}\n"
-            msg += f"\nProcessed {len(selectedObjects)} object(s):\n"
+            if self.chb_resetTransforms.isChecked():
+                msg += "\nTransforms applied/frozen"
+            msg += msg_exportState
+            msg += f"\n\nProcessed {len(selectedObjects)} object(s):\n"
             msg += "\n".join([f"  - {obj.name}" for obj in selectedObjects[:10]])
             if len(selectedObjects) > 10:
                 msg += f"\n  ... and {len(selectedObjects) - 10} more"
