@@ -277,28 +277,47 @@ class ModelCreationDialog(QDialog):
 
         # Process each object
         try:
-            # Step 1: Check if asset null already exists, create if not
+            # Step 1: Create or get the export collection
+            collectionName = f"ASSET_{assetName}_EXPORT"
+            exportCollection = bpy.data.collections.get(collectionName)
+
+            if not exportCollection:
+                # Create the collection
+                exportCollection = bpy.data.collections.new(collectionName)
+                bpy.context.scene.collection.children.link(exportCollection)
+                print(f"Created collection: {collectionName}")
+            else:
+                print(f"Using existing collection: {collectionName}")
+
+            # Step 2: Check if asset null already exists, create if not
             assetNullName = assetName
             assetNull = bpy.data.objects.get(assetNullName)
 
             if not assetNull:
                 # Create asset null (empty object)
                 assetNull = bpy.data.objects.new(assetNullName, None)
-                bpy.context.scene.collection.objects.link(assetNull)
+                exportCollection.objects.link(assetNull)
                 print(f"Created asset null: {assetNullName}")
             else:
                 print(f"Using existing asset null: {assetNullName}")
+                # Move to export collection if not already there
+                if assetNull.name not in exportCollection.objects:
+                    exportCollection.objects.link(assetNull)
+                    # Remove from other collections
+                    for col in assetNull.users_collection:
+                        if col != exportCollection:
+                            col.objects.unlink(assetNull)
 
-            # Step 2: Create model group null (prefix without <modelName>)
+            # Step 3: Create model group null (prefix without <modelName>)
             modelGroupName = self.resultString
             modelGroupNull = bpy.data.objects.new(modelGroupName, None)
-            bpy.context.scene.collection.objects.link(modelGroupNull)
+            exportCollection.objects.link(modelGroupNull)
             print(f"Created model group null: {modelGroupName}")
 
-            # Step 3: Parent model group to asset null
+            # Step 4: Parent model group to asset null
             modelGroupNull.parent = assetNull
 
-            # Step 4: Process each selected object
+            # Step 5: Process each selected object
             for obj in selectedObjects:
                 # Get the original object name to use as modelName
                 originalName = obj.name
@@ -322,7 +341,17 @@ class ModelCreationDialog(QDialog):
                 obj.parent = modelGroupNull
                 print(f"Parented {newObjectName} to {modelGroupName}")
 
+                # Move object to export collection if not already there
+                if obj.name not in exportCollection.objects:
+                    exportCollection.objects.link(obj)
+                    # Remove from other collections
+                    for col in obj.users_collection:
+                        if col != exportCollection:
+                            col.objects.unlink(obj)
+                    print(f"Moved {newObjectName} to collection {collectionName}")
+
             msg = f"Model created successfully!\n\n"
+            msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
             msg += f"Model Group: {modelGroupName}\n"
             msg += f"\nProcessed {len(selectedObjects)} object(s):\n"
