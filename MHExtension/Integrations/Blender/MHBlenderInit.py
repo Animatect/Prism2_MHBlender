@@ -133,6 +133,7 @@ class ModelCreationDialog(QDialog):
         assetLabel.setMinimumWidth(120)
         self.e_assetName = QLineEdit()
         self.e_assetName.setText(self.assetName)
+        self.e_assetName.setToolTip("El nombre de un asset existente en el proyecto o uno a ser creado.")
         self.e_assetName.textChanged.connect(self.updatePreview)
         assetLayout.addWidget(assetLabel)
         assetLayout.addWidget(self.e_assetName)
@@ -143,6 +144,8 @@ class ModelCreationDialog(QDialog):
         descLabel = QLabel("Description:")
         descLabel.setMinimumWidth(120)
         self.e_description = QLineEdit()
+        self.e_description.setText("Main")  # Set default value
+        self.e_description.setToolTip("Un adjetivo que describa lo que hace a ésta variante distinta de las demás, por ejemplo, 'Alta', 'Amarilla', 'Dañada', etc.")
         self.e_description.textChanged.connect(self.updatePreview)
         descLayout.addWidget(descLabel)
         descLayout.addWidget(self.e_description)
@@ -156,6 +159,7 @@ class ModelCreationDialog(QDialog):
         self.sb_variantNumber.setMinimum(0)
         self.sb_variantNumber.setMaximum(9999)
         self.sb_variantNumber.setValue(1)
+        self.sb_variantNumber.setToolTip("Dentro de variantes con la misma descripción éste número sirve como un identificador.")
         self.sb_variantNumber.valueChanged.connect(self.updatePreview)
         variantLayout.addWidget(variantLabel)
         variantLayout.addWidget(self.sb_variantNumber)
@@ -271,6 +275,23 @@ class ModelCreationDialog(QDialog):
         if not selectedObjects:
             self.core.popup("Please add at least one object to the selection", title="Validation Error")
             return
+
+        # Auto-increment variant number if name already exists
+        originalVariantNumber = variantNumber
+        while bpy.data.objects.get(self.resultString) is not None:
+            variantNumber += 1
+            parts = []
+            if assetName:
+                parts.append(assetName)
+            if description:
+                parts.append(description)
+            if variantNumber > 0:
+                parts.append(f"var{variantNumber:03d}")
+            self.resultString = "_".join(parts)
+            print(f"Name conflict detected. Incremented variant to: {variantNumber}")
+
+        if variantNumber != originalVariantNumber:
+            print(f"Variant number auto-incremented from {originalVariantNumber} to {variantNumber}")
 
         print(f"Model creation string: {self.resultString}")
         print(f"Selected objects: {[obj.name for obj in selectedObjects]}")
