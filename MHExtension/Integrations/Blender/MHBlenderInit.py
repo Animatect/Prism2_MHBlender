@@ -426,8 +426,6 @@ class ModelCreationDialog(QDialog):
             # Step 6: Reset transforms if requested
             if self.chb_resetTransforms.isChecked():
                 objs = selectedObjects
-                print("########## selectedObjects: ", selectedObjects)
-                print("########## self.objects: ", self.objects)
                 self.selectObjectsAndApplyTransforms(objs)
 
                 # Deselect all
@@ -442,18 +440,20 @@ class ModelCreationDialog(QDialog):
                         sm = self.core.stateManager()
                         if sm:
                             # Create export state
-                            exportState = sm.createState("Export", setActive=True)
-                            if exportState:
-                                # Set the output name to the model group name
+                            stateItem = sm.createState("Export", setActive=True)
+                            if stateItem and hasattr(stateItem, 'ui'):
+                                exportState = stateItem.ui
+                                # Set the state name to "Modeling"
                                 if hasattr(exportState, 'e_name'):
-                                    exportState.e_name.setText(modelGroupName)
+                                    exportState.e_name.setText("Modeling")
 
-                                # Add objects to the export state
-                                if hasattr(exportState, 'nodes'):
-                                    for obj in selectedObjects:
-                                        exportState.nodes.append(obj.name)
+                                # Add the ASSET_<AssetName>_EXPORT collection to the export state
+                                assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
+                                if assetExportCollection:
+                                    # Use addObjects() which properly adds to the collection and updates the UI
+                                    exportState.addObjects(objects=[assetExportCollection])
 
-                                print(f"Created export state: {modelGroupName}")
+                                print(f"Created export state: Modeling with collection {collectionName}")
                                 msg_exportState = "\nExport state created successfully!"
                             else:
                                 print("Failed to create export state")
@@ -482,7 +482,7 @@ class ModelCreationDialog(QDialog):
             if len(selectedObjects) > 10:
                 msg += f"\n  ... and {len(selectedObjects) - 10} more"
 
-            self.core.popup(msg, title="MH Create Model - Success")
+            self.core.popup(msg, title="MH Create Model - Success", severity="info")
             self.close()
 
         except Exception as e:
@@ -636,7 +636,7 @@ class MH_CreateModel(bpy.types.Operator):
                             if episodeName:
                                 msg += f"\nEpisode: {episodeName}"
 
-                            pcore.popup(msg, title="MH Create Model")
+                            pcore.popup(msg, title="MH Create Model", severity="info")
                             return {"CANCELLED"}
                         else:
                             print(f"Unknown entity type: {entityType}")
@@ -712,7 +712,7 @@ class MH_CreateModel(bpy.types.Operator):
                     if episodeName:
                         msg += f"\nEpisode: {episodeName}"
 
-                    pcore.popup(msg, title="MH Create Model")
+                    pcore.popup(msg, title="MH Create Model", severity="info")
 
                 else:
                     print(f"Unknown entity type: {entityType}")
