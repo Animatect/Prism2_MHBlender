@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir \"C:\\Program Files\\Prism2\\Scripts\\ProjectScripts\\StateManagerNodes\" /b)"
+      "Bash(dir \"C:\\Program Files\\Prism2\\Scripts\\ProjectScripts\\StateManagerNodes\" /b)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

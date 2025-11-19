@@ -28,7 +28,6 @@ if mhExtensionRoot not in sys.path:
 
 # Ensure PrismCore is available
 sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
-import PrismCore
 
 from qtpy.QtCore import *
 from qtpy.QtGui import *
@@ -42,10 +41,31 @@ else:
     Region = "UI"
 
 
-def prismInit():
-    """Initialize Prism Core"""
-    pcore = PrismCore.PrismCore(app="Blender", prismArgs=["noProjectBrowser"])
+# Global pcore - will be set by PrismInit.py or initialized standalone
+pcore = None
+
+
+def initWithCore(prism_core):
+    """Initialize MH Extension with an existing Prism Core instance from PrismInit.py"""
+    global pcore
+    pcore = prism_core
+
+    # Register Blender classes
+    _register_classes()
+
+    print("MH Blender Extension initialized with shared Prism Core")
     return pcore
+
+
+def _register_classes():
+    """Register Blender operator and panel classes"""
+    try:
+        bpy.utils.register_class(MH_CreateModel)
+        bpy.utils.register_class(MH_RenamePlant)
+        bpy.utils.register_class(MH_OpsPanel)
+        print("MH Blender Extension classes registered successfully")
+    except Exception as e:
+        print(f"ERROR - MHBlenderInit class registration - {str(e)}")
 
 
 # Global storage for active dialogs to prevent garbage collection
@@ -773,7 +793,12 @@ class MH_OpsPanel(bpy.types.Panel):
 
 # Registration functions
 def register():
-    """Register Blender classes"""
+    """Register Blender classes - standalone mode (creates its own PrismCore)
+
+    Note: When integrated with PrismInit.py, use initWithCore() instead.
+    This function is kept for backwards compatibility when MHBlenderInit.py
+    is loaded as a standalone startup script.
+    """
     if bpy.app.background:
         return
 
@@ -783,14 +808,13 @@ def register():
         if qapp is None:
             qapp = QApplication(sys.argv)
 
-        # Initialize Prism Core as a global variable
+        # Initialize Prism Core as a global variable (standalone mode)
         global pcore
-        pcore = prismInit()
+        import PrismCore
+        pcore = PrismCore.PrismCore(app="Blender", prismArgs=["noProjectBrowser"])
 
-        bpy.utils.register_class(MH_CreateModel)
-        bpy.utils.register_class(MH_RenamePlant)
-        bpy.utils.register_class(MH_OpsPanel)
-        print("MH Blender Extension registered successfully")
+        _register_classes()
+        print("MH Blender Extension registered successfully (standalone mode)")
     except Exception as e:
         print(f"ERROR - MHBlenderInit registration - {str(e)}")
 

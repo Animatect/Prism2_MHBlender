@@ -399,7 +399,7 @@ class Prism_MHExtension_Integration(object):
 
 	@err_catcher(name=__name__)
 	def addBlender(self, installPath):
-		"""Install MH Blender panel to Blender startup scripts"""
+		"""Install MH Blender panel to Blender startup scripts and patch PrismInit.py"""
 		try:
 			if not os.path.exists(installPath):
 				QMessageBox.warning(
@@ -421,11 +421,22 @@ class Prism_MHExtension_Integration(object):
 				)
 				return False
 
+			# Check if PrismInit.py exists (Prism must be installed first)
+			prismInitFile = os.path.join(scriptsPath, "PrismInit.py")
+			if not os.path.exists(prismInitFile):
+				QMessageBox.warning(
+					self.core.messageParent,
+					"MH Integration",
+					"PrismInit.py not found in %s.\nPlease install Prism's Blender integration first." % scriptsPath,
+					QMessageBox.Ok,
+				)
+				return False
+
 			integrationBase = os.path.join(
 				os.path.dirname(os.path.dirname(__file__)), "Integrations", "Blender"
 			)
 
-			# Target file path
+			# Target file path for MHBlenderInit.py
 			targetFile = os.path.join(scriptsPath, "MHBlenderInit.py")
 			origFile = os.path.join(integrationBase, "MHBlenderInit.py")
 
@@ -453,6 +464,9 @@ class Prism_MHExtension_Integration(object):
 			with open(targetFile, "w") as init:
 				init.write(initStr)
 
+			# Now patch PrismInit.py to import and initialize MHBlenderInit with shared pcore
+			self._patchPrismInit(prismInitFile)
+
 			return True
 
 		except Exception as e:
@@ -466,18 +480,100 @@ class Prism_MHExtension_Integration(object):
 			return False
 
 	@err_catcher(name=__name__)
+	def _patchPrismInit(self, prismInitFile):
+		"""Patch PrismInit.py to import and initialize MHBlenderInit with shared pcore"""
+		with open(prismInitFile, "r") as f:
+			content = f.read()
+
+		# Check if already patched
+		if "MHBlenderInit" in content:
+			logger.debug("PrismInit.py already patched with MHBlenderInit")
+			return
+
+		# Add import after the existing imports
+		importLine = "\n# MH Extension Integration\ntry:\n    import MHBlenderInit\n    _mhExtensionAvailable = True\nexcept ImportError:\n    _mhExtensionAvailable = False\n"
+
+		# Find the location after "from bpy.app.handlers import persistent"
+		insertPoint = content.find("from bpy.app.handlers import persistent")
+		if insertPoint != -1:
+			# Find the end of that line
+			endOfLine = content.find("\n", insertPoint)
+			if endOfLine != -1:
+				content = content[:endOfLine+1] + importLine + content[endOfLine+1:]
+
+		# Add initialization call after pcore is created in register()
+		# Find "global pcore" and then "pcore = prismInit()"
+		registerSection = content.find("def register():")
+		if registerSection != -1:
+			# Find where pcore is assigned
+			pcoreAssign = content.find("pcore = prismInit()", registerSection)
+			if pcoreAssign != -1:
+				# Find the end of that line
+				endOfLine = content.find("\n", pcoreAssign)
+				if endOfLine != -1:
+					# Add MH Extension initialization
+					mhInitCode = "\n        # Initialize MH Extension with shared pcore\n        if _mhExtensionAvailable:\n            try:\n                MHBlenderInit.initWithCore(pcore)\n            except Exception as e:\n                print(f'ERROR - MHBlenderInit initialization - {str(e)}')\n"
+					content = content[:endOfLine+1] + mhInitCode + content[endOfLine+1:]
+
+		# Write back the patched content
+		with open(prismInitFile, "w") as f:
+			f.write(content)
+
+		logger.info("Successfully patched PrismInit.py with MHBlenderInit integration")
+
+	@err_catcher(name=__name__)
+	def _unpatchPrismInit(self, prismInitFile):
+		"""Remove MHBlenderInit patches from PrismInit.py"""
+		if not os.path.exists(prismInitFile):
+			return
+
+		with open(prismInitFile, "r") as f:
+			content = f.read()
+
+		# Check if patched
+		if "MHBlenderInit" not in content:
+			return
+
+		# Remove the import block
+		importStart = content.find("# MH Extension Integration")
+		if importStart != -1:
+			importEnd = content.find("_mhExtensionAvailable = False\n", importStart)
+			if importEnd != -1:
+				importEnd = content.find("\n", importEnd) + 1
+				content = content[:importStart] + content[importEnd:]
+
+		# Remove the initialization block
+		initStart = content.find("# Initialize MH Extension with shared pcore")
+		if initStart != -1:
+			# Find the end of this block (next line that doesn't start with spaces after the try block)
+			initEnd = content.find("print(f'ERROR - MHBlenderInit initialization", initStart)
+			if initEnd != -1:
+				initEnd = content.find("\n", initEnd) + 1
+				content = content[:initStart] + content[initEnd:]
+
+		# Write back the cleaned content
+		with open(prismInitFile, "w") as f:
+			f.write(content)
+
+		logger.info("Successfully removed MHBlenderInit patches from PrismInit.py")
+
+	@err_catcher(name=__name__)
 	def removeBlender(self, installPath):
-		"""Remove MH Blender panel from Blender startup scripts"""
 		try:
 			scriptsPath = os.path.join(installPath, "scripts", "startup")
 			targetFile = os.path.join(scriptsPath, "MHBlenderInit.py")
+			prismInitFile = os.path.join(scriptsPath, "PrismInit.py")
 
+			# Remove MHBlenderInit.py
 			if os.path.exists(targetFile):
 				os.remove(targetFile)
 
 			# Also remove .pyc if it exists
 			if os.path.exists(targetFile + "c"):
 				os.remove(targetFile + "c")
+
+			# Unpatch PrismInit.py
+			self._unpatchPrismInit(prismInitFile)
 
 			return True
 
