@@ -33,6 +33,7 @@ import PrismCore
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
+from qtpy.QtWidgets import QListWidgetItem
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -450,8 +451,18 @@ class ModelCreationDialog(QDialog):
                                 # Add the ASSET_<AssetName>_EXPORT collection to the export state
                                 assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
                                 if assetExportCollection:
-                                    # Use addObjects() which properly adds to the collection and updates the UI
-                                    exportState.addObjects(objects=[assetExportCollection])
+                                    # Directly add only the collection to nodes (not its contents)
+                                    collectionNode = self.core.appPlugin.getNode(assetExportCollection)
+                                    exportState.nodes = [collectionNode]
+
+                                    # Manually update the UI list widget (bypass updateObjectList which calls sm_export_updateObjects)
+                                    exportState.lw_objects.clear()
+                                    for node in exportState.nodes:
+                                        if self.core.appPlugin.isNodeValid(exportState, node):
+                                            item = QListWidgetItem(self.core.appPlugin.getNodeName(exportState, node))
+                                            exportState.lw_objects.addItem(item)
+
+                                    sm.saveStatesToScene()
 
                                 print(f"Created export state: Modeling with collection {collectionName}")
                                 msg_exportState = "\nExport state created successfully!"
