@@ -44,7 +44,7 @@ else:
 
 def prismInit():
     """Initialize Prism Core"""
-    pcore = PrismCore.PrismCore(app="Blender")
+    pcore = PrismCore.PrismCore(app="Blender", prismArgs=["noProjectBrowser"])
     return pcore
 
 
@@ -739,6 +739,21 @@ class MH_CreateModel(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class MH_RenamePlant(bpy.types.Operator):
+    """Rename Plant using MH pipeline"""
+    bl_idname = "object.mh_rename_plant"
+    bl_label = "Rename Plant"
+
+    def execute(self, context):
+        try:
+            # TODO: Implement rename plant functionality
+            pcore.popup("Rename Plant functionality coming soon!", title="MH Rename Plant")
+        except Exception as e:
+            print(f"ERROR - MH_RenamePlant - {str(e)}")
+
+        return {'FINISHED'}
+
+
 class MH_OpsPanel(bpy.types.Panel):
     """MH Operations Panel"""
     bl_label = "MH Ops"
@@ -752,6 +767,8 @@ class MH_OpsPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("object.mh_create_model")
+        row = layout.row()
+        row.operator("object.mh_rename_plant")
 
 
 # Registration functions
@@ -771,6 +788,7 @@ def register():
         pcore = prismInit()
 
         bpy.utils.register_class(MH_CreateModel)
+        bpy.utils.register_class(MH_RenamePlant)
         bpy.utils.register_class(MH_OpsPanel)
         print("MH Blender Extension registered successfully")
     except Exception as e:
@@ -784,6 +802,7 @@ def unregister():
 
     try:
         bpy.utils.unregister_class(MH_CreateModel)
+        bpy.utils.unregister_class(MH_RenamePlant)
         bpy.utils.unregister_class(MH_OpsPanel)
         print("MH Blender Extension unregistered")
     except Exception as e:
