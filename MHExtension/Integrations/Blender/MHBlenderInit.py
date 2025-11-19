@@ -452,40 +452,57 @@ class ModelCreationDialog(QDialog):
                 # Deselect all
                 bpy.ops.object.select_all(action='DESELECT')
 
-            # Step 7: Create export state if requested
+            # Step 7: Create or update export state if requested
             if self.chb_createExportState.isChecked():
-                print("Creating export state...")
+                print("Creating/updating export state...")
                 try:
                     # Check if State Manager is available
                     if hasattr(self.core, 'stateManager') and self.core.stateManager:
                         sm = self.core.stateManager()
                         if sm:
-                            # Create export state
-                            stateItem = sm.createState("Export", setActive=True)
+                            # Check if a state named "Modeling" already exists
+                            existingState = None
+                            stateItem = None
+                            for i in range(sm.tw_export.topLevelItemCount()):
+                                item = sm.tw_export.topLevelItem(i)
+                                if hasattr(item, 'ui') and hasattr(item.ui, 'e_name'):
+                                    if item.ui.e_name.text() == "Modeling":
+                                        existingState = item
+                                        break
+
+                            if existingState:
+                                # Use existing state
+                                stateItem = existingState
+                                print("Found existing 'Modeling' export state, updating it...")
+                                stateAction = "updated"
+                            else:
+                                # Create new export state
+                                stateItem = sm.createState("Export", setActive=True)
+                                stateAction = "created"
+                                if stateItem and hasattr(stateItem, 'ui'):
+                                    # Set the state name to "Modeling"
+                                    if hasattr(stateItem.ui, 'e_name'):
+                                        stateItem.ui.e_name.setText("Modeling")
+
                             if stateItem and hasattr(stateItem, 'ui'):
                                 exportState = stateItem.ui
-                                # Set the state name to "Modeling"
-                                if hasattr(exportState, 'e_name'):
-                                    exportState.e_name.setText("Modeling")
 
                                 # Add the ASSET_<AssetName>_EXPORT collection to the export state
                                 assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
                                 if assetExportCollection:
-                                    # Directly add only the collection to nodes (not its contents)
-                                    collectionNode = self.core.appPlugin.getNode(assetExportCollection)
-                                    exportState.nodes = [collectionNode]
+                                    # Use Prism's built-in method to properly add the collection
+                                    # This links the collection to the task's tracking collection
+                                    self.core.appPlugin.sm_export_addObjects(
+                                        exportState,
+                                        objects=[assetExportCollection]
+                                    )
 
-                                    # Manually update the UI list widget (bypass updateObjectList which calls sm_export_updateObjects)
-                                    exportState.lw_objects.clear()
-                                    for node in exportState.nodes:
-                                        if self.core.appPlugin.isNodeValid(exportState, node):
-                                            item = QListWidgetItem(self.core.appPlugin.getNodeName(exportState, node))
-                                            exportState.lw_objects.addItem(item)
-
+                                    # Update the UI to reflect the changes
+                                    exportState.updateUi()
                                     sm.saveStatesToScene()
 
-                                print(f"Created export state: Modeling with collection {collectionName}")
-                                msg_exportState = "\nExport state created successfully!"
+                                print(f"{stateAction.capitalize()} export state: Modeling with collection {collectionName}")
+                                msg_exportState = f"\nExport state {stateAction} successfully!"
                             else:
                                 print("Failed to create export state")
                                 msg_exportState = "\nFailed to create export state"

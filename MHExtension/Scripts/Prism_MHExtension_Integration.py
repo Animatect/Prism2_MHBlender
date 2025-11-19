@@ -559,6 +559,7 @@ class Prism_MHExtension_Integration(object):
 
 	@err_catcher(name=__name__)
 	def removeBlender(self, installPath):
+		"""Remove MH Blender panel from Blender startup scripts and unpatch PrismInit.py"""
 		try:
 			scriptsPath = os.path.join(installPath, "scripts", "startup")
 			targetFile = os.path.join(scriptsPath, "MHBlenderInit.py")
