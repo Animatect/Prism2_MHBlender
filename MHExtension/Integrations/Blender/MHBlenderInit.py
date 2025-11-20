@@ -373,6 +373,7 @@ class ModelCreationDialog(QDialog):
         self.tw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tw_objects.customContextMenuRequested.connect(self.rcObjects)
+        self.tw_objects.itemSelectionChanged.connect(self.onTableSelectionChanged)
         self.tw_objects.setMinimumHeight(150)  # Minimum height
         objectsLayout.addWidget(self.tw_objects)
 
@@ -970,6 +971,28 @@ class ModelCreationDialog(QDialog):
         """Clear all objects from the table"""
         self.tw_objects.setRowCount(0)
         self.objects = []
+
+    def onTableSelectionChanged(self):
+        """Handle table selection changes - select corresponding objects in Blender"""
+        try:
+            # Get selected rows
+            selectedRows = set(index.row() for index in self.tw_objects.selectedIndexes())
+
+            # Deselect all objects in Blender first
+            bpy.ops.object.select_all(action='DESELECT')
+
+            # Select objects corresponding to selected rows
+            for row in selectedRows:
+                if row < len(self.objects):
+                    obj = self.objects[row]
+                    if obj and obj.name in bpy.data.objects:
+                        obj.select_set(True)
+                        # Set the last selected object as active
+                        bpy.context.view_layer.objects.active = obj
+
+            print(f"Selected {len(selectedRows)} object(s) in Blender scene")
+        except Exception as e:
+            print(f"Error selecting objects in scene: {e}")
 
     def getObjects(self):
         """Return the list of selected objects with their tags"""
