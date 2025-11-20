@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox
+from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox, QRadioButton
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -271,14 +271,29 @@ class ModelCreationDialog(QDialog):
         separator2.setFrameShadow(QFrame.Sunken)
         layout.addWidget(separator2)
 
-        # Checkboxes for options
+        # Options layout
         optionsLayout = QVBoxLayout()
 
-        self.chb_resetTransforms = QCheckBox("Reset Transforms (Apply/Freeze)")
-        self.chb_resetTransforms.setChecked(True)
-        self.chb_resetTransforms.setToolTip("Aplica/congela las transformaciones de los objetos (ubicación, rotación, escala)")
-        optionsLayout.addWidget(self.chb_resetTransforms)
+        # Transform options group box
+        transformGroupBox = QGroupBox("Transform Options")
+        transformLayout = QVBoxLayout(transformGroupBox)
 
+        self.rb_zeroTransforms = QRadioButton("Zero Transforms")
+        self.rb_zeroTransforms.setChecked(True)  # Default
+        self.rb_zeroTransforms.setToolTip("Resetea las transformaciones a cero (ubicación, rotación, escala a valores por defecto)")
+        transformLayout.addWidget(self.rb_zeroTransforms)
+
+        self.rb_freezeTransforms = QRadioButton("Freeze Transforms")
+        self.rb_freezeTransforms.setToolTip("Aplica/congela las transformaciones en la geometría del objeto")
+        transformLayout.addWidget(self.rb_freezeTransforms)
+
+        self.rb_doNothing = QRadioButton("Do Nothing")
+        self.rb_doNothing.setToolTip("No modifica las transformaciones de los objetos")
+        transformLayout.addWidget(self.rb_doNothing)
+
+        optionsLayout.addWidget(transformGroupBox)
+
+        # Export state checkbox
         self.chb_createExportState = QCheckBox("Create Export State")
         self.chb_createExportState.setChecked(True)
         self.chb_createExportState.setToolTip("Crea un estado de exportación en el State Manager de Prism")
@@ -371,12 +386,6 @@ class ModelCreationDialog(QDialog):
                         tagCombo.setCurrentText(currentTag)
                 else:
                     tagCombo.addItem("")  # Only empty option when None selected
-
-    def selectObjectsAndApplyTransforms(self, objects):
-
-        for obj in objects:
-            self.freeze_transforms(obj)
-            print(f"Applied transforms to {len(objects)} object(s)")
 
     def freeze_transforms(self, obj):
         mw = obj.matrix_world.copy()
@@ -528,13 +537,19 @@ class ModelCreationDialog(QDialog):
                             col.objects.unlink(obj)
                     print(f"Moved {newObjectName} to collection {collectionName}")
 
-            # Step 6: Reset transforms if requested
-            if self.chb_resetTransforms.isChecked():
-                objs = selectedObjects
-                self.selectObjectsAndApplyTransforms(objs)
-
-                # Deselect all
-                bpy.ops.object.select_all(action='DESELECT')
+            # Step 6: Apply transforms based on selected option
+            if self.rb_zeroTransforms.isChecked():
+                print("Applying zero transforms...")
+                for obj in selectedObjects:
+                    self.reset_transforms(obj)
+                print(f"Applied zero transforms to {len(selectedObjects)} object(s)")
+            elif self.rb_freezeTransforms.isChecked():
+                print("Applying freeze transforms...")
+                for obj in selectedObjects:
+                    self.freeze_transforms(obj)
+                print(f"Applied freeze transforms to {len(selectedObjects)} object(s)")
+            else:
+                print("Skipping transform operations (Do Nothing selected)")
 
             # Step 7: Create or update export state if requested
             if self.chb_createExportState.isChecked():
@@ -605,8 +620,15 @@ class ModelCreationDialog(QDialog):
             msg = f"Model created successfully!\n\n"
             msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
-            if self.chb_resetTransforms.isChecked():
-                msg += "\nTransforms applied/frozen"
+
+            # Show which transform option was applied
+            if self.rb_zeroTransforms.isChecked():
+                msg += "\nTransforms: Zeroed"
+            elif self.rb_freezeTransforms.isChecked():
+                msg += "\nTransforms: Frozen"
+            else:
+                msg += "\nTransforms: Unchanged"
+
             msg += msg_exportState
             msg += f"\n\nProcessed {len(selectedObjects)} object(s):\n"
             msg += "\n".join([f"  - {obj.name}" for obj in selectedObjects[:10]])
