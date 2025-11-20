@@ -122,7 +122,6 @@ def _register_classes():
     """Register Blender operator and panel classes"""
     try:
         bpy.utils.register_class(MH_CreateModel)
-        bpy.utils.register_class(MH_RenamePlant)
         bpy.utils.register_class(MH_OpsPanel)
         print("MH Blender Extension classes registered successfully")
     except Exception as e:
@@ -1189,175 +1188,6 @@ class MH_CreateModel(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class RenamePlantDialog(QDialog):
-    """Dialog for selecting plant part to rename"""
-
-    def __init__(self, core, parent=None):
-        super(RenamePlantDialog, self).__init__(parent)
-        self.core = core
-        self.selectedPart = None
-        self.setupUi()
-
-    def setupUi(self):
-        self.setWindowTitle("Rename Plant")
-        self.resize(200, 350)
-
-        # Set window flags to stay on top
-        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
-
-        # Connect to cleanup when dialog is closed
-        self.finished.connect(self.onFinished)
-
-        # Main layout
-        layout = QVBoxLayout(self)
-        layout.setSpacing(8)
-
-        # Plant part buttons
-        plantParts = [
-            "frutos",
-            "flores",
-            "hojas",
-            "lianas",
-            "tallo",
-            "tronco",
-            "raices"
-        ]
-
-        for part in plantParts:
-            btn = QPushButton(part.capitalize())
-            btn.setMinimumHeight(35)
-            btn.clicked.connect(lambda checked, p=part: self.onPartSelected(p))
-            layout.addWidget(btn)
-
-        # Add stretch and cancel button
-        layout.addStretch()
-
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.clicked.connect(self.reject)
-        layout.addWidget(self.btn_cancel)
-
-    def onPartSelected(self, part):
-        """Handle plant part selection and rename selected objects"""
-        import re
-
-        self.selectedPart = part
-        print(f"Selected plant part: {part}")
-
-        # Get selected objects from Blender
-        try:
-            selectedObjects = list(bpy.context.view_layer.objects.selected)
-        except AttributeError:
-            selectedObjects = [obj for obj in bpy.data.objects if obj.select_get()]
-
-        if not selectedObjects:
-            self.core.popup("No objects selected. Please select objects to rename.", title="MH Rename Plant")
-            return
-
-        # Pattern to find var### (e.g., var001, var123, etc.)
-        pattern = re.compile(r'(.*?)(var\d{3})(.*)')
-
-        renamedCount = 0
-        skippedObjects = []
-
-        for obj in selectedObjects:
-            # Try to find the var### pattern in the object name
-            match = pattern.match(obj.name)
-
-            if match:
-                # Extract the prefix (everything before var###)
-                prefix = match.group(1) + match.group(2)  # Keep prefix + var###
-
-                # Build new name: prefix_partName
-                newObjectName = f"{prefix}_{part}"
-
-                # Check if the new name already exists
-                if bpy.data.objects.get(newObjectName):
-                    print(f"Skipped {obj.name}: Name '{newObjectName}' already exists")
-                    skippedObjects.append(obj.name)
-                    continue
-
-                # Rename the object
-                oldName = obj.name
-                obj.name = newObjectName
-                print(f"Renamed object: {oldName} -> {newObjectName}")
-
-                # Rename the mesh/curve data
-                if obj.type == 'MESH' and obj.data:
-                    obj.data.name = f"{newObjectName}_Mesh"
-                    print(f"Renamed mesh data to: {obj.data.name}")
-                elif obj.type == 'CURVE' and obj.data:
-                    obj.data.name = f"{newObjectName}_Curve"
-                    print(f"Renamed curve data to: {obj.data.name}")
-
-                renamedCount += 1
-            else:
-                print(f"Skipped {obj.name}: No var### pattern found")
-                skippedObjects.append(obj.name)
-
-        # Show results
-        if renamedCount > 0:
-            msg = f"Successfully renamed {renamedCount} object(s) to use '{part}'."
-            if skippedObjects:
-                msg += f"\n\nSkipped {len(skippedObjects)} object(s):"
-                msg += "\n" + "\n".join([f"  - {name}" for name in skippedObjects[:10]])
-                if len(skippedObjects) > 10:
-                    msg += f"\n  ... and {len(skippedObjects) - 10} more"
-            self.core.popup(msg, title="MH Rename Plant - Success", severity="info")
-        else:
-            msg = "No objects were renamed."
-            if skippedObjects:
-                msg += f"\n\nReasons:\n- No var### pattern found\n- Name already exists"
-                msg += f"\n\nSkipped objects:\n"
-                msg += "\n".join([f"  - {name}" for name in skippedObjects[:10]])
-                if len(skippedObjects) > 10:
-                    msg += f"\n  ... and {len(skippedObjects) - 10} more"
-            self.core.popup(msg, title="MH Rename Plant")
-
-        self.accept()
-
-    def getSelectedPart(self):
-        """Return the selected plant part"""
-        return self.selectedPart
-
-    def onFinished(self):
-        """Cleanup when dialog is closed"""
-        global _active_dialogs
-        if self in _active_dialogs:
-            _active_dialogs.remove(self)
-
-
-class MH_RenamePlant(bpy.types.Operator):
-    """Rename Plant using MH pipeline"""
-    bl_idname = "object.mh_rename_plant"
-    bl_label = "Rename Plant"
-
-    def execute(self, context):
-        global _active_dialogs
-
-        try:
-            # Open RenamePlantDialog
-            dialog = RenamePlantDialog(core=pcore)
-            pcore.parentWindow(dialog)
-
-            # Keep reference to prevent garbage collection
-            _active_dialogs.append(dialog)
-
-            result = dialog.exec_()
-
-            if result == QDialog.Accepted:
-                print("Rename Plant completed successfully")
-            else:
-                print("Rename Plant dialog cancelled")
-
-        except Exception as e:
-            import traceback
-            print(f"ERROR - MH_RenamePlant - {str(e)}")
-            print(traceback.format_exc())
-            pcore.popup(f"Error: {str(e)}", title="MH Rename Plant Error")
-
-        return {'FINISHED'}
-
-
 class MH_OpsPanel(bpy.types.Panel):
     """MH Operations Panel"""
     bl_label = "MH Ops"
@@ -1371,8 +1201,6 @@ class MH_OpsPanel(bpy.types.Panel):
 
         row = layout.row()
         row.operator("object.mh_create_model")
-        row = layout.row()
-        row.operator("object.mh_rename_plant")
 
 
 # Registration functions
@@ -1410,7 +1238,6 @@ def unregister():
 
     try:
         bpy.utils.unregister_class(MH_CreateModel)
-        bpy.utils.unregister_class(MH_RenamePlant)
         bpy.utils.unregister_class(MH_OpsPanel)
         print("MH Blender Extension unregistered")
     except Exception as e:
