@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox
+from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -220,13 +220,14 @@ class ModelCreationDialog(QDialog):
         self.gb_objects = QGroupBox("Objects (Meshes and Curves)")
         objectsLayout = QVBoxLayout(self.gb_objects)
 
-        # Table widget for objects with tag column
+        # Table widget for objects with variant and tag columns
         self.tw_objects = QTableWidget()
-        self.tw_objects.setColumnCount(2)
-        self.tw_objects.setHorizontalHeaderLabels(["Object Name", "Tag"])
+        self.tw_objects.setColumnCount(3)
+        self.tw_objects.setHorizontalHeaderLabels(["Object Name", "Variant", "Tag"])
         self.tw_objects.horizontalHeader().setStretchLastSection(False)
         self.tw_objects.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tw_objects.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tw_objects.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tw_objects.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -307,31 +308,45 @@ class ModelCreationDialog(QDialog):
         """Update the preview label based on current field values"""
         assetName = self.e_assetName.text().strip()
         description = self.e_description.text().strip()
-        variantNumber = self.sb_variantNumber.value()
 
-        # Build the preview string
-        parts = []
-        if assetName:
-            parts.append(assetName)
-        if description:
-            parts.append(description)
-        if variantNumber > 0:
-            # Format variant number with "var" prefix and 3-digit zero padding
-            parts.append(f"var{variantNumber:03d}")
+        # Show format explanation
+        previewText = "Format: AssetName_Description_var###_<modelName or tag>\n"
+        previewText += "\nNote: Each object has its own variant number"
 
-        if parts:
-            previewText = "_".join(parts) + "_<modelName or tag>"
-        else:
-            previewText = "<modelName or tag>"
+        # Show examples from actual objects in the table if any exist
+        if self.tw_objects.rowCount() > 0:
+            previewText += "\n\nExamples from current objects:"
 
-        # Add example with tag if any objects have tags selected
-        objectTags = self.getObjectTags()
-        if objectTags:
-            # Show example with first tag
-            firstTag = list(objectTags.values())[0]
-            exampleParts = parts.copy()
-            exampleParts.append(firstTag)
-            previewText += f"\n\nExample with tag: {('_'.join(exampleParts))}"
+            # Get first 3 objects as examples
+            for row in range(min(3, self.tw_objects.rowCount())):
+                # Get object name
+                nameItem = self.tw_objects.item(row, 0)
+                if nameItem:
+                    objName = nameItem.text()
+
+                    # Get variant
+                    variantSpinBox = self.tw_objects.cellWidget(row, 1)
+                    variantNum = variantSpinBox.value() if variantSpinBox else 1
+
+                    # Get tag
+                    tagCombo = self.tw_objects.cellWidget(row, 2)
+                    tag = tagCombo.currentText() if tagCombo else ""
+
+                    # Build example name
+                    parts = []
+                    if assetName:
+                        parts.append(assetName)
+                    if description:
+                        parts.append(description)
+                    if variantNum > 0:
+                        parts.append(f"var{variantNum:03d}")
+
+                    # Use tag or object name
+                    modelName = tag if tag else objName
+                    parts.append(modelName)
+
+                    exampleName = "_".join(parts) if parts else modelName
+                    previewText += f"\n  • {exampleName}"
 
         self.l_preview.setText(previewText)
 
@@ -341,7 +356,7 @@ class ModelCreationDialog(QDialog):
 
         # Update all existing rows with new tag options
         for row in range(self.tw_objects.rowCount()):
-            tagCombo = self.tw_objects.cellWidget(row, 1)
+            tagCombo = self.tw_objects.cellWidget(row, 2)  # Tag is now column 2
             if tagCombo:
                 # Store current selection if it exists in new tags
                 currentTag = tagCombo.currentText()
@@ -390,47 +405,18 @@ class ModelCreationDialog(QDialog):
         """Validate and create the model"""
         assetName = self.e_assetName.text().strip()
         description = self.e_description.text().strip()
-        variantNumber = self.sb_variantNumber.value()
 
-        # Build the result string (without <modelName>)
-        parts = []
-        if assetName:
-            parts.append(assetName)
-        if description:
-            parts.append(description)
-        if variantNumber > 0:
-            # Format variant number with "var" prefix and 3-digit zero padding
-            parts.append(f"var{variantNumber:03d}")
-
-        if not parts:
+        # Validate asset name
+        if not assetName:
             self.core.popup("Please fill in at least the Asset Name field", title="Validation Error")
             return
 
-        self.resultString = "_".join(parts)
         selectedObjects = self.getObjects()
 
         if not selectedObjects:
             self.core.popup("Please add at least one object to the selection", title="Validation Error")
             return
 
-        # Auto-increment variant number if name already exists
-        originalVariantNumber = variantNumber
-        while bpy.data.objects.get(self.resultString) is not None:
-            variantNumber += 1
-            parts = []
-            if assetName:
-                parts.append(assetName)
-            if description:
-                parts.append(description)
-            if variantNumber > 0:
-                parts.append(f"var{variantNumber:03d}")
-            self.resultString = "_".join(parts)
-            print(f"Name conflict detected. Incremented variant to: {variantNumber}")
-
-        if variantNumber != originalVariantNumber:
-            print(f"Variant number auto-incremented from {originalVariantNumber} to {variantNumber}")
-
-        print(f"Model creation string: {self.resultString}")
         print(f"Selected objects: {[obj.name for obj in selectedObjects]}")
 
         # Process each object
@@ -466,47 +452,56 @@ class ModelCreationDialog(QDialog):
                         if col != exportCollection:
                             col.objects.unlink(assetNull)
 
-            # Step 3: Create model group null (prefix without <modelName>)
-            modelGroupName = self.resultString
-            modelGroupNull = bpy.data.objects.new(modelGroupName, None)
-            exportCollection.objects.link(modelGroupNull)
-            print(f"Created model group null: {modelGroupName}")
-
-            # Step 4: Parent model group to asset null
-            modelGroupNull.parent = assetNull
-
-            # Step 5: Process each selected object
-            # Get object tags
+            # Step 3: Process each selected object with per-object variants
+            # Get object tags and variants
             objectTags = self.getObjectTags()
+            objectVariants = self.getObjectVariants()
             usedTagNames = {}  # Track how many times each tag has been used
 
             for idx, obj in enumerate(selectedObjects):
                 # Get the original object name to use as modelName
                 originalName = obj.name
 
+                # Get the variant number for this object
+                variantNumber = objectVariants.get(idx, 1)
+
+                # Build the prefix for this object: AssetName_Description_var###
+                parts = []
+                if assetName:
+                    parts.append(assetName)
+                if description:
+                    parts.append(description)
+                if variantNumber > 0:
+                    parts.append(f"var{variantNumber:03d}")
+
+                objectPrefix = "_".join(parts) if parts else ""
+
                 # Check if this object has a tag assigned
                 if idx in objectTags:
                     tag = objectTags[idx]
 
-                    # Handle version numbering for duplicate tags
-                    if tag in usedTagNames:
-                        usedTagNames[tag] += 1
-                        modelName = f"{tag}.v{usedTagNames[tag]:02d}"
+                    # Build key for tracking this tag with this variant
+                    tagKey = f"{objectPrefix}_{tag}"
+
+                    # Handle version numbering for duplicate tags within same variant
+                    if tagKey in usedTagNames:
+                        usedTagNames[tagKey] += 1
+                        modelName = f"{tag}.v{usedTagNames[tagKey]:02d}"
                     else:
-                        usedTagNames[tag] = 1
                         # Check if base tag name already exists
-                        baseName = f"{self.resultString}_{tag}"
+                        baseName = f"{objectPrefix}_{tag}"
                         if bpy.data.objects.get(baseName) is not None:
-                            modelName = f"{tag}.v01"
-                            usedTagNames[tag] = 1
+                            usedTagNames[tagKey] = 2
+                            modelName = f"{tag}.v02"
                         else:
+                            usedTagNames[tagKey] = 1
                             modelName = tag
                 else:
                     # No tag selected, use original object name
                     modelName = originalName
 
                 # Build the new object name: prefix_modelName
-                newObjectName = f"{self.resultString}_{modelName}"
+                newObjectName = f"{objectPrefix}_{modelName}" if objectPrefix else modelName
 
                 # Rename the object
                 obj.name = newObjectName
@@ -520,9 +515,9 @@ class ModelCreationDialog(QDialog):
                     obj.data.name = f"{newObjectName}_Curve"
                     print(f"Renamed curve data to: {obj.data.name}")
 
-                # Parent the object to the model group null
-                obj.parent = modelGroupNull
-                print(f"Parented {newObjectName} to {modelGroupName}")
+                # Parent the object to the asset null
+                obj.parent = assetNull
+                print(f"Parented {newObjectName} to {assetNullName}")
 
                 # Move object to export collection if not already there
                 if obj.name not in exportCollection.objects:
@@ -610,7 +605,6 @@ class ModelCreationDialog(QDialog):
             msg = f"Model created successfully!\n\n"
             msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
-            msg += f"Model Group: {modelGroupName}\n"
             if self.chb_resetTransforms.isChecked():
                 msg += "\nTransforms applied/frozen"
             msg += msg_exportState
@@ -673,7 +667,16 @@ class ModelCreationDialog(QDialog):
                 nameItem.setFlags(nameItem.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 self.tw_objects.setItem(row, 0, nameItem)
 
-                # Add tag dropdown to second column
+                # Add variant spinbox to second column
+                variantSpinBox = QSpinBox()
+                variantSpinBox.setMinimum(1)
+                variantSpinBox.setMaximum(9999)
+                variantSpinBox.setValue(self.sb_variantNumber.value())  # Use global variant as default
+                variantSpinBox.setToolTip("Número de variante para este objeto")
+                variantSpinBox.valueChanged.connect(self.updatePreview)  # Update preview when variant changes
+                self.tw_objects.setCellWidget(row, 1, variantSpinBox)
+
+                # Add tag dropdown to third column
                 tagCombo = QComboBox()
                 if currentCategory != "None" and tags:
                     tagCombo.addItem("")  # Empty option
@@ -681,7 +684,8 @@ class ModelCreationDialog(QDialog):
                 else:
                     tagCombo.addItem("")  # Only empty option when None selected
 
-                self.tw_objects.setCellWidget(row, 1, tagCombo)
+                tagCombo.currentTextChanged.connect(self.updatePreview)  # Update preview when tag changes
+                self.tw_objects.setCellWidget(row, 2, tagCombo)
 
                 addedCount += 1
                 print(f"DEBUG: Added {obj.name} to table")
@@ -731,12 +735,21 @@ class ModelCreationDialog(QDialog):
         """Return a dictionary mapping object indices to their selected tags"""
         tags = {}
         for row in range(self.tw_objects.rowCount()):
-            tagCombo = self.tw_objects.cellWidget(row, 1)
+            tagCombo = self.tw_objects.cellWidget(row, 2)  # Tag is now column 2
             if tagCombo:
                 tag = tagCombo.currentText()
                 if tag:  # Only include non-empty tags
                     tags[row] = tag
         return tags
+
+    def getObjectVariants(self):
+        """Return a dictionary mapping object indices to their variant numbers"""
+        variants = {}
+        for row in range(self.tw_objects.rowCount()):
+            variantSpinBox = self.tw_objects.cellWidget(row, 1)  # Variant is column 1
+            if variantSpinBox:
+                variants[row] = variantSpinBox.value()
+        return variants
 
     def onFinished(self):
         """Cleanup when dialog is closed"""
