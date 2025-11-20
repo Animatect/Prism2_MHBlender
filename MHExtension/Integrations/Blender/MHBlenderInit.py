@@ -45,6 +45,67 @@ else:
 pcore = None
 
 
+def createExportStateStandalone(core, assetName, collectionName):
+    """Standalone function to create export state (called from timer)"""
+    print("Creating/updating export state (standalone)...")
+    try:
+        # Check if State Manager is available
+        if hasattr(core, 'stateManager') and core.stateManager:
+            sm = core.stateManager()
+            if sm:
+                # Check if a state named "Modeling" already exists
+                existingState = None
+                stateItem = None
+                for i in range(sm.tw_export.topLevelItemCount()):
+                    item = sm.tw_export.topLevelItem(i)
+                    if hasattr(item, 'ui') and hasattr(item.ui, 'e_name'):
+                        if item.ui.e_name.text() == "Modeling":
+                            existingState = item
+                            break
+
+                if existingState:
+                    # Use existing state
+                    stateItem = existingState
+                    print("Found existing 'Modeling' export state, updating it...")
+                    stateAction = "updated"
+                else:
+                    # Create new export state
+                    stateItem = sm.createState("Export", setActive=True)
+                    stateAction = "created"
+                    if stateItem and hasattr(stateItem, 'ui'):
+                        # Set the state name to "Modeling"
+                        if hasattr(stateItem.ui, 'e_name'):
+                            stateItem.ui.e_name.setText("Modeling")
+
+                if stateItem and hasattr(stateItem, 'ui'):
+                    exportState = stateItem.ui
+
+                    # Add the ASSET_<AssetName>_EXPORT collection to the export state
+                    assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
+                    if assetExportCollection:
+                        # Use Prism's built-in method to properly add the collection
+                        # This links the collection to the task's tracking collection
+                        core.appPlugin.sm_export_addObjects(
+                            exportState,
+                            objects=[assetExportCollection]
+                        )
+
+                        # Update the UI to reflect the changes
+                        exportState.updateUi()
+                        sm.saveStatesToScene()
+
+                    print(f"{stateAction.capitalize()} export state: Modeling with collection {collectionName}")
+                else:
+                    print("Failed to create export state")
+            else:
+                print("State Manager not available")
+        else:
+            print("State Manager not available")
+    except Exception as e:
+        import traceback
+        print(f"Error creating export state: {e}\n{traceback.format_exc()}")
+
+
 def initWithCore(prism_core):
     """Initialize MH Extension with an existing Prism Core instance from PrismInit.py"""
     global pcore
@@ -593,74 +654,14 @@ class ModelCreationDialog(QDialog):
 
             # Step 7: Deselect all objects before creating export state
             bpy.ops.object.select_all(action='DESELECT')
-            print("Deselected all objects")
 
-            # Step 8: Create or update export state if requested
-            if self.chb_createExportState.isChecked():
-                print("Creating/updating export state...")
-                try:
-                    # Check if State Manager is available
-                    if hasattr(self.core, 'stateManager') and self.core.stateManager:
-                        sm = self.core.stateManager()
-                        if sm:
-                            # Check if a state named "Modeling" already exists
-                            existingState = None
-                            stateItem = None
-                            for i in range(sm.tw_export.topLevelItemCount()):
-                                item = sm.tw_export.topLevelItem(i)
-                                if hasattr(item, 'ui') and hasattr(item.ui, 'e_name'):
-                                    if item.ui.e_name.text() == "Modeling":
-                                        existingState = item
-                                        break
+            # Force Blender to update the view layer and depsgraph
+            bpy.context.view_layer.update()
+            bpy.context.evaluated_depsgraph_get().update()
 
-                            if existingState:
-                                # Use existing state
-                                stateItem = existingState
-                                print("Found existing 'Modeling' export state, updating it...")
-                                stateAction = "updated"
-                            else:
-                                # Create new export state
-                                stateItem = sm.createState("Export", setActive=True)
-                                stateAction = "created"
-                                if stateItem and hasattr(stateItem, 'ui'):
-                                    # Set the state name to "Modeling"
-                                    if hasattr(stateItem.ui, 'e_name'):
-                                        stateItem.ui.e_name.setText("Modeling")
+            print("Deselected all objects and refreshed view layer")
 
-                            if stateItem and hasattr(stateItem, 'ui'):
-                                exportState = stateItem.ui
-
-                                # Add the ASSET_<AssetName>_EXPORT collection to the export state
-                                assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
-                                if assetExportCollection:
-                                    # Use Prism's built-in method to properly add the collection
-                                    # This links the collection to the task's tracking collection
-                                    self.core.appPlugin.sm_export_addObjects(
-                                        exportState,
-                                        objects=[assetExportCollection]
-                                    )
-
-                                    # Update the UI to reflect the changes
-                                    exportState.updateUi()
-                                    sm.saveStatesToScene()
-
-                                print(f"{stateAction.capitalize()} export state: Modeling with collection {collectionName}")
-                                msg_exportState = f"\nExport state {stateAction} successfully!"
-                            else:
-                                print("Failed to create export state")
-                                msg_exportState = "\nFailed to create export state"
-                        else:
-                            print("State Manager not available")
-                            msg_exportState = "\nState Manager not available"
-                    else:
-                        print("State Manager not available")
-                        msg_exportState = "\nState Manager not available"
-                except Exception as e:
-                    print(f"Error creating export state: {e}")
-                    msg_exportState = f"\nError creating export state: {e}"
-            else:
-                msg_exportState = ""
-
+            # Step 8: Build success message
             msg = f"Model created successfully!\n\n"
             msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
@@ -679,14 +680,38 @@ class ModelCreationDialog(QDialog):
             else:
                 msg += "\nTransforms: Unchanged"
 
-            msg += msg_exportState
+            # Add export state message if enabled
+            if self.chb_createExportState.isChecked():
+                msg += "\n\nExport state will be created shortly..."
+
             msg += f"\n\nProcessed {len(selectedObjects)} object(s):\n"
             msg += "\n".join([f"  - {obj.name}" for obj in selectedObjects[:10]])
             if len(selectedObjects) > 10:
                 msg += f"\n  ... and {len(selectedObjects) - 10} more"
 
+            # Show success popup and close dialog
             self.core.popup(msg, title="MH Create Model - Success", severity="info")
             self.close()
+
+            # Step 9: Schedule export state creation after dialog closes (1 second delay)
+            if self.chb_createExportState.isChecked():
+                print("Scheduling export state creation for 1 second from now...")
+                # Store references to avoid garbage collection
+                core = self.core
+
+                # Create standalone function for timer
+                def create_state_deferred():
+                    print("Creating export state (deferred)...")
+                    try:
+                        createExportStateStandalone(core, assetName, collectionName)
+                    except Exception as e:
+                        print(f"Error in timer callback: {e}")
+                        import traceback
+                        traceback.print_exc()
+                    return None  # Unregister timer
+
+                # Register the timer
+                bpy.app.timers.register(create_state_deferred, first_interval=1.0)
 
         except Exception as e:
             import traceback
