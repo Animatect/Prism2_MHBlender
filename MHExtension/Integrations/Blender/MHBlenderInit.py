@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox, QRadioButton
+from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox, QRadioButton, QGroupBox, QSplitter
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -216,7 +216,11 @@ class ModelCreationDialog(QDialog):
         presetLayout.addWidget(self.cb_presetCategory)
         layout.addLayout(presetLayout)
 
-        # Objects GroupBox
+        # Create a splitter for resizable sections
+        self.splitter = QSplitter(Qt.Vertical)
+        layout.addWidget(self.splitter)
+
+        # Objects GroupBox (resizable via splitter)
         self.gb_objects = QGroupBox("Objects (Meshes and Curves)")
         objectsLayout = QVBoxLayout(self.gb_objects)
 
@@ -232,6 +236,7 @@ class ModelCreationDialog(QDialog):
         self.tw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tw_objects.customContextMenuRequested.connect(self.rcObjects)
+        self.tw_objects.setMinimumHeight(150)  # Minimum height
         objectsLayout.addWidget(self.tw_objects)
 
         # Add button
@@ -240,36 +245,31 @@ class ModelCreationDialog(QDialog):
         self.b_addObjects.clicked.connect(self.addObjects)
         objectsLayout.addWidget(self.b_addObjects)
 
-        layout.addWidget(self.gb_objects)
+        self.splitter.addWidget(self.gb_objects)
 
-        # Add separator
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(separator)
+        # Preview GroupBox (collapsible with checkbox)
+        self.gb_preview = QGroupBox("Preview")
+        self.gb_preview.setCheckable(True)
+        self.gb_preview.setChecked(True)  # Expanded by default
+        previewLayout = QVBoxLayout(self.gb_preview)
 
-        # Preview label
-        previewLayout = QVBoxLayout()
-        previewTitleLabel = QLabel("Preview:")
-        previewTitleLabel.setStyleSheet("font-weight: bold;")
         self.l_preview = QLabel("")
-        self.l_preview.setStyleSheet("font-size: 12pt; padding: 10px; background-color: #2a2a2a; border: 1px solid #555;")
+        self.l_preview.setStyleSheet("font-size: 10pt; padding: 10px; background-color: #2a2a2a; border: 1px solid #555;")
         self.l_preview.setWordWrap(True)
-        previewLayout.addWidget(previewTitleLabel)
+        self.l_preview.setMinimumHeight(80)
         previewLayout.addWidget(self.l_preview)
-        layout.addLayout(previewLayout)
+
+        self.splitter.addWidget(self.gb_preview)
+
+        # Set initial splitter sizes (objects gets more space)
+        self.splitter.setSizes([300, 150])
+        self.splitter.setStretchFactor(0, 1)  # Objects section stretches more
 
         # Update initial preview
         self.updatePreview()
 
         # Initialize object list
         self.objects = []
-
-        # Add separator
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(separator2)
 
         # Options layout
         optionsLayout = QVBoxLayout()
