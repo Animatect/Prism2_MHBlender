@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtWidgets import QListWidgetItem
+from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -134,6 +134,21 @@ class ModelCreationDialog(QDialog):
         self.core = core
         self.assetName = assetName
         self.resultString = None
+
+        # Preset categories and tags dictionary
+        self.presetCategories = {
+            "None": [],
+            "plantParts": [
+                "frutos",
+                "flores",
+                "hojas",
+                "lianas",
+                "tallo",
+                "tronco",
+                "raices"
+            ]
+        }
+
         self.setupUi()
 
     def setupUi(self):
@@ -189,16 +204,34 @@ class ModelCreationDialog(QDialog):
         variantLayout.addStretch()
         layout.addLayout(variantLayout)
 
+        # Presets dropdown
+        presetLayout = QHBoxLayout()
+        presetLabel = QLabel("Preset Category:")
+        presetLabel.setMinimumWidth(120)
+        self.cb_presetCategory = QComboBox()
+        self.cb_presetCategory.addItems(list(self.presetCategories.keys()))
+        self.cb_presetCategory.setToolTip("Selecciona una categoría de presets para asignar tags a los objetos")
+        self.cb_presetCategory.currentTextChanged.connect(self.onPresetCategoryChanged)
+        presetLayout.addWidget(presetLabel)
+        presetLayout.addWidget(self.cb_presetCategory)
+        layout.addLayout(presetLayout)
+
         # Objects GroupBox
         self.gb_objects = QGroupBox("Objects (Meshes and Curves)")
         objectsLayout = QVBoxLayout(self.gb_objects)
 
-        # List widget for objects
-        self.lw_objects = QListWidget()
-        self.lw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.lw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.lw_objects.customContextMenuRequested.connect(self.rcObjects)
-        objectsLayout.addWidget(self.lw_objects)
+        # Table widget for objects with tag column
+        self.tw_objects = QTableWidget()
+        self.tw_objects.setColumnCount(2)
+        self.tw_objects.setHorizontalHeaderLabels(["Object Name", "Tag"])
+        self.tw_objects.horizontalHeader().setStretchLastSection(False)
+        self.tw_objects.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tw_objects.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tw_objects.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.tw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tw_objects.customContextMenuRequested.connect(self.rcObjects)
+        objectsLayout.addWidget(self.tw_objects)
 
         # Add button
         self.b_addObjects = QPushButton("Add Selected")
@@ -287,11 +320,42 @@ class ModelCreationDialog(QDialog):
             parts.append(f"var{variantNumber:03d}")
 
         if parts:
-            previewText = "_".join(parts) + "_<modelName>"
+            previewText = "_".join(parts) + "_<modelName or tag>"
         else:
-            previewText = "<modelName>"
+            previewText = "<modelName or tag>"
+
+        # Add example with tag if any objects have tags selected
+        objectTags = self.getObjectTags()
+        if objectTags:
+            # Show example with first tag
+            firstTag = list(objectTags.values())[0]
+            exampleParts = parts.copy()
+            exampleParts.append(firstTag)
+            previewText += f"\n\nExample with tag: {('_'.join(exampleParts))}"
 
         self.l_preview.setText(previewText)
+
+    def onPresetCategoryChanged(self, category):
+        """Handle preset category change - update tag dropdowns in all rows"""
+        tags = self.presetCategories.get(category, [])
+
+        # Update all existing rows with new tag options
+        for row in range(self.tw_objects.rowCount()):
+            tagCombo = self.tw_objects.cellWidget(row, 1)
+            if tagCombo:
+                # Store current selection if it exists in new tags
+                currentTag = tagCombo.currentText()
+                tagCombo.clear()
+
+                if category != "None" and tags:
+                    tagCombo.addItem("")  # Add empty option
+                    tagCombo.addItems(tags)
+
+                    # Restore previous selection if still valid
+                    if currentTag in tags:
+                        tagCombo.setCurrentText(currentTag)
+                else:
+                    tagCombo.addItem("")  # Only empty option when None selected
 
     def selectObjectsAndApplyTransforms(self, objects):
 
@@ -412,12 +476,37 @@ class ModelCreationDialog(QDialog):
             modelGroupNull.parent = assetNull
 
             # Step 5: Process each selected object
-            for obj in selectedObjects:
+            # Get object tags
+            objectTags = self.getObjectTags()
+            usedTagNames = {}  # Track how many times each tag has been used
+
+            for idx, obj in enumerate(selectedObjects):
                 # Get the original object name to use as modelName
                 originalName = obj.name
 
+                # Check if this object has a tag assigned
+                if idx in objectTags:
+                    tag = objectTags[idx]
+
+                    # Handle version numbering for duplicate tags
+                    if tag in usedTagNames:
+                        usedTagNames[tag] += 1
+                        modelName = f"{tag}.v{usedTagNames[tag]:02d}"
+                    else:
+                        usedTagNames[tag] = 1
+                        # Check if base tag name already exists
+                        baseName = f"{self.resultString}_{tag}"
+                        if bpy.data.objects.get(baseName) is not None:
+                            modelName = f"{tag}.v01"
+                            usedTagNames[tag] = 1
+                        else:
+                            modelName = tag
+                else:
+                    # No tag selected, use original object name
+                    modelName = originalName
+
                 # Build the new object name: prefix_modelName
-                newObjectName = f"{self.resultString}_{originalName}"
+                newObjectName = f"{self.resultString}_{modelName}"
 
                 # Rename the object
                 obj.name = newObjectName
@@ -565,56 +654,89 @@ class ModelCreationDialog(QDialog):
             self.core.popup("Please select at least one mesh or curve object", title="No Valid Objects")
             return
 
-        # Add objects to the list (avoid duplicates)
+        # Get current preset category and tags
+        currentCategory = self.cb_presetCategory.currentText()
+        tags = self.presetCategories.get(currentCategory, [])
+
+        # Add objects to the table (avoid duplicates)
         addedCount = 0
         for obj in validObjects:
             if obj not in self.objects:
                 self.objects.append(obj)
-                self.lw_objects.addItem(obj.name)
+
+                # Add row to table
+                row = self.tw_objects.rowCount()
+                self.tw_objects.insertRow(row)
+
+                # Add object name to first column
+                nameItem = QTableWidgetItem(obj.name)
+                nameItem.setFlags(nameItem.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                self.tw_objects.setItem(row, 0, nameItem)
+
+                # Add tag dropdown to second column
+                tagCombo = QComboBox()
+                if currentCategory != "None" and tags:
+                    tagCombo.addItem("")  # Empty option
+                    tagCombo.addItems(tags)
+                else:
+                    tagCombo.addItem("")  # Only empty option when None selected
+
+                self.tw_objects.setCellWidget(row, 1, tagCombo)
+
                 addedCount += 1
-                print(f"DEBUG: Added {obj.name} to list")
+                print(f"DEBUG: Added {obj.name} to table")
             else:
                 print(f"DEBUG: {obj.name} already in list, skipping")
 
         print(f"DEBUG: Added {addedCount} objects. Total objects in list: {len(self.objects)}")
-        print(f"DEBUG: List widget item count: {self.lw_objects.count()}")
+        print(f"DEBUG: Table widget row count: {self.tw_objects.rowCount()}")
 
     def rcObjects(self, pos):
-        """Right-click context menu for object list"""
-        item = self.lw_objects.itemAt(pos)
+        """Right-click context menu for object table"""
+        row = self.tw_objects.rowAt(pos.y())
 
-        if item is None:
-            self.lw_objects.setCurrentRow(-1)
+        if row == -1:
+            self.tw_objects.clearSelection()
 
         createMenu = QMenu()
 
-        if item is not None:
+        if row != -1:
             actRemove = QAction("Remove", self)
-            actRemove.triggered.connect(lambda: self.removeItem(item))
+            actRemove.triggered.connect(self.removeSelectedItems)
             createMenu.addAction(actRemove)
 
         actClear = QAction("Clear", self)
         actClear.triggered.connect(self.clearItems)
         createMenu.addAction(actClear)
 
-        createMenu.exec_(self.lw_objects.mapToGlobal(pos))
+        createMenu.exec_(self.tw_objects.mapToGlobal(pos))
 
-    def removeItem(self, item):
-        """Remove selected items from the list"""
-        items = self.lw_objects.selectedItems()
-        for item in reversed(items):
-            rowNum = self.lw_objects.row(item)
-            del self.objects[rowNum]
-            self.lw_objects.takeItem(rowNum)
+    def removeSelectedItems(self):
+        """Remove selected rows from the table"""
+        selectedRows = sorted(set(index.row() for index in self.tw_objects.selectedIndexes()), reverse=True)
+        for row in selectedRows:
+            del self.objects[row]
+            self.tw_objects.removeRow(row)
 
     def clearItems(self):
-        """Clear all objects from the list"""
-        self.lw_objects.clear()
+        """Clear all objects from the table"""
+        self.tw_objects.setRowCount(0)
         self.objects = []
 
     def getObjects(self):
-        """Return the list of selected objects"""
+        """Return the list of selected objects with their tags"""
         return self.objects
+
+    def getObjectTags(self):
+        """Return a dictionary mapping object indices to their selected tags"""
+        tags = {}
+        for row in range(self.tw_objects.rowCount()):
+            tagCombo = self.tw_objects.cellWidget(row, 1)
+            if tagCombo:
+                tag = tagCombo.currentText()
+                if tag:  # Only include non-empty tags
+                    tags[row] = tag
+        return tags
 
     def onFinished(self):
         """Cleanup when dialog is closed"""
