@@ -266,30 +266,26 @@ class ModelCreationDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
-        # Asset Name field
-        assetLayout = QHBoxLayout()
+        # Asset Name GroupBox
+        assetGroupBox = QGroupBox("Asset")
+        assetGroupLayout = QHBoxLayout(assetGroupBox)
         assetLabel = QLabel("Asset Name:")
         assetLabel.setMinimumWidth(120)
         self.e_assetName = QLineEdit()
         self.e_assetName.setText(self.assetName)
         self.e_assetName.setToolTip("El nombre de un asset existente en el proyecto o uno a ser creado.")
         self.e_assetName.textChanged.connect(self.updatePreview)
-        assetLayout.addWidget(assetLabel)
-        assetLayout.addWidget(self.e_assetName)
-        layout.addLayout(assetLayout)
+        assetGroupLayout.addWidget(assetLabel)
+        assetGroupLayout.addWidget(self.e_assetName)
+        layout.addWidget(assetGroupBox)
 
-        # Separator after Asset Name
-        separator1 = QFrame()
-        separator1.setFrameShape(QFrame.HLine)
-        separator1.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(separator1)
-
-        # Description field with category and tag dropdowns
-        descLayout = QVBoxLayout()
+        # Description GroupBox
+        descGroupBox = QGroupBox("Description")
+        descGroupLayout = QVBoxLayout(descGroupBox)
 
         # Category dropdown
         categoryLayout = QHBoxLayout()
-        categoryLabel = QLabel("Description Category:")
+        categoryLabel = QLabel("Category:")
         categoryLabel.setMinimumWidth(120)
         self.cb_descriptionCategory = QComboBox()
         self.cb_descriptionCategory.addItems(list(self.descriptionCategories.keys()))
@@ -297,11 +293,11 @@ class ModelCreationDialog(QDialog):
         self.cb_descriptionCategory.currentTextChanged.connect(self.onDescriptionCategoryChanged)
         categoryLayout.addWidget(categoryLabel)
         categoryLayout.addWidget(self.cb_descriptionCategory)
-        descLayout.addLayout(categoryLayout)
+        descGroupLayout.addLayout(categoryLayout)
 
         # Tag dropdown with apply button
         tagLayout = QHBoxLayout()
-        tagLabel = QLabel("Description Tag:")
+        tagLabel = QLabel("Tag:")
         tagLabel.setMinimumWidth(120)
         self.cb_descriptionTag = QComboBox()
         self.cb_descriptionTag.setToolTip("Selecciona un tag de descripción")
@@ -318,13 +314,14 @@ class ModelCreationDialog(QDialog):
         tagLayout.addWidget(tagLabel)
         tagLayout.addWidget(self.cb_descriptionTag)
         tagLayout.addWidget(self.btn_applyDescriptionTag)
-        descLayout.addLayout(tagLayout)
+        descGroupLayout.addLayout(tagLayout)
 
-        layout.addLayout(descLayout)
+        layout.addWidget(descGroupBox)
 
-        # Variant Number field with apply button
-        variantLayout = QHBoxLayout()
-        variantLabel = QLabel("Variant Number:")
+        # Variant Number GroupBox
+        variantGroupBox = QGroupBox("Variant")
+        variantGroupLayout = QHBoxLayout(variantGroupBox)
+        variantLabel = QLabel("Number:")
         variantLabel.setMinimumWidth(120)
         self.sb_variantNumber = QSpinBox()
         self.sb_variantNumber.setMinimum(0)
@@ -337,17 +334,11 @@ class ModelCreationDialog(QDialog):
         self.btn_applyVariant.setToolTip("Aplica el número de variante a todos los objetos seleccionados en la tabla")
         self.btn_applyVariant.clicked.connect(self.applyVariantToSelected)
 
-        variantLayout.addWidget(variantLabel)
-        variantLayout.addWidget(self.sb_variantNumber)
-        variantLayout.addWidget(self.btn_applyVariant)
-        variantLayout.addStretch()
-        layout.addLayout(variantLayout)
-
-        # Separator after Variant Number
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(separator2)
+        variantGroupLayout.addWidget(variantLabel)
+        variantGroupLayout.addWidget(self.sb_variantNumber)
+        variantGroupLayout.addWidget(self.btn_applyVariant)
+        variantGroupLayout.addStretch()
+        layout.addWidget(variantGroupBox)
 
         # Presets dropdown
         presetLayout = QHBoxLayout()
@@ -418,9 +409,9 @@ class ModelCreationDialog(QDialog):
         # Options layout
         optionsLayout = QVBoxLayout()
 
-        # Transform options group box
+        # Transform options group box (horizontal layout)
         transformGroupBox = QGroupBox("Transform Options")
-        transformLayout = QVBoxLayout(transformGroupBox)
+        transformLayout = QHBoxLayout(transformGroupBox)
 
         self.rb_zeroTransforms = QRadioButton("Zero Transforms")
         self.rb_zeroTransforms.setChecked(True)  # Default
@@ -434,6 +425,8 @@ class ModelCreationDialog(QDialog):
         self.rb_doNothing = QRadioButton("Do Nothing")
         self.rb_doNothing.setToolTip("No modifica las transformaciones de los objetos")
         transformLayout.addWidget(self.rb_doNothing)
+
+        transformLayout.addStretch()  # Push buttons to the left
 
         optionsLayout.addWidget(transformGroupBox)
 
