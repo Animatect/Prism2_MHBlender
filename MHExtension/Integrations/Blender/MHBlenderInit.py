@@ -196,17 +196,57 @@ class ModelCreationDialog(QDialog):
         self.assetName = assetName
         self.resultString = None
 
-        # Preset categories and tags dictionary
+        # Preset categories and tags dictionary (for model tags)
         self.presetCategories = {
             "None": [],
             "plantParts": [
-                "frutos",
-                "flores",
-                "hojas",
-                "lianas",
-                "tallo",
-                "tronco",
-                "raices"
+                "frutos", "flores", "hojas", "lianas",
+                "tallo", "tronco", "raices"
+            ]
+        }
+
+        # Description categories and tags dictionary (for descriptions)
+        self.descriptionCategories = {
+            "Default": ["default"],
+            "Nivel de detalle": [
+                "Low", "Medium", "High", "Simplified", "Optimized", "Dense",
+                "Lightweight", "Proxy", "Hero", "Background"
+            ],
+            "Estado físico o condición": [
+                "Clean", "Dirty", "Worn", "Broken", "Damaged", "Aged",
+                "Rusty", "Polished", "Wet", "Dry", "Burnt", "Frozen"
+            ],
+            "Función narrativa o de producción": [
+                "Primary", "Secondary", "Tertiary", "Generic", "Special",
+                "Cinematic", "Stunt", "FX-ready"
+            ],
+            "Estilo o tratamiento visual": [
+                "Realistic", "Stylized", "Toony", "Graphic", "Minimalist",
+                "High-contrast", "Soft", "Harsh", "Textured", "Matte", "Glossy"
+            ],
+            "Variantes técnicas": [
+                "Rigged", "Unrigged", "UVed", "Retopo", "Baked", "Shaded",
+                "Unlit", "PBR", "Cached", "Simmed", "Proxy", "StandIn"
+            ],
+            "Variantes de animación o pose": [
+                "Neutral", "Expression_angry", "Expression_happy",
+                "Expression_sad", "PoseA", "PoseB", "Action-ready",
+                "Relaxed", "Dynamic", "Squash", "Stretch"
+            ],
+            "Variantes para props o entornos": [
+                "Open", "Closed", "Full", "Empty", "Cluttered", "Clean",
+                "Seasonal", "Lit", "Unlit", "Destroyed", "Intact"
+            ],
+            "Tamaño general": [
+                "Small", "Medium", "Large", "XL", "Tiny", "Micro",
+                "Giant", "Massive", "Compact", "Bulky"
+            ],
+            "Proporción": [
+                "Wide", "Narrow", "Tall", "Short", "Long", "Slim",
+                "Thick", "Heavy-set", "Stretched", "Compressed"
+            ],
+            "Dimensión volumétrica": [
+                "Voluminous", "Flat", "Inflated", "Deflated", "Hollow", "Solid"
             ]
         }
 
@@ -238,19 +278,51 @@ class ModelCreationDialog(QDialog):
         assetLayout.addWidget(self.e_assetName)
         layout.addLayout(assetLayout)
 
-        # Description field
-        descLayout = QHBoxLayout()
-        descLabel = QLabel("Description:")
-        descLabel.setMinimumWidth(120)
-        self.e_description = QLineEdit()
-        self.e_description.setText("Main")  # Set default value
-        self.e_description.setToolTip("Un adjetivo que describa lo que hace a ésta variante distinta de las demás, por ejemplo, 'Alta', 'Amarilla', 'Dañada', etc.")
-        self.e_description.textChanged.connect(self.updatePreview)
-        descLayout.addWidget(descLabel)
-        descLayout.addWidget(self.e_description)
+        # Separator after Asset Name
+        separator1 = QFrame()
+        separator1.setFrameShape(QFrame.HLine)
+        separator1.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(separator1)
+
+        # Description field with category and tag dropdowns
+        descLayout = QVBoxLayout()
+
+        # Category dropdown
+        categoryLayout = QHBoxLayout()
+        categoryLabel = QLabel("Description Category:")
+        categoryLabel.setMinimumWidth(120)
+        self.cb_descriptionCategory = QComboBox()
+        self.cb_descriptionCategory.addItems(list(self.descriptionCategories.keys()))
+        self.cb_descriptionCategory.setToolTip("Selecciona una categoría para las descripciones")
+        self.cb_descriptionCategory.currentTextChanged.connect(self.onDescriptionCategoryChanged)
+        categoryLayout.addWidget(categoryLabel)
+        categoryLayout.addWidget(self.cb_descriptionCategory)
+        descLayout.addLayout(categoryLayout)
+
+        # Tag dropdown with apply button
+        tagLayout = QHBoxLayout()
+        tagLabel = QLabel("Description Tag:")
+        tagLabel.setMinimumWidth(120)
+        self.cb_descriptionTag = QComboBox()
+        self.cb_descriptionTag.setToolTip("Selecciona un tag de descripción")
+        self.cb_descriptionTag.currentTextChanged.connect(self.updatePreview)
+
+        # Populate with default category tags
+        defaultTags = self.descriptionCategories.get("Default", ["default"])
+        self.cb_descriptionTag.addItems(defaultTags)
+
+        self.btn_applyDescriptionTag = QPushButton("Apply to Selected")
+        self.btn_applyDescriptionTag.setToolTip("Aplica el tag seleccionado a todos los objetos seleccionados en la tabla")
+        self.btn_applyDescriptionTag.clicked.connect(self.applyDescriptionTagToSelected)
+
+        tagLayout.addWidget(tagLabel)
+        tagLayout.addWidget(self.cb_descriptionTag)
+        tagLayout.addWidget(self.btn_applyDescriptionTag)
+        descLayout.addLayout(tagLayout)
+
         layout.addLayout(descLayout)
 
-        # Variant Number field
+        # Variant Number field with apply button
         variantLayout = QHBoxLayout()
         variantLabel = QLabel("Variant Number:")
         variantLabel.setMinimumWidth(120)
@@ -260,10 +332,22 @@ class ModelCreationDialog(QDialog):
         self.sb_variantNumber.setValue(1)
         self.sb_variantNumber.setToolTip("Dentro de variantes con la misma descripción éste número sirve como un identificador.")
         self.sb_variantNumber.valueChanged.connect(self.updatePreview)
+
+        self.btn_applyVariant = QPushButton("Apply to Selected")
+        self.btn_applyVariant.setToolTip("Aplica el número de variante a todos los objetos seleccionados en la tabla")
+        self.btn_applyVariant.clicked.connect(self.applyVariantToSelected)
+
         variantLayout.addWidget(variantLabel)
         variantLayout.addWidget(self.sb_variantNumber)
+        variantLayout.addWidget(self.btn_applyVariant)
         variantLayout.addStretch()
         layout.addLayout(variantLayout)
+
+        # Separator after Variant Number
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(separator2)
 
         # Presets dropdown
         presetLayout = QHBoxLayout()
@@ -449,6 +533,58 @@ class ModelCreationDialog(QDialog):
                         tagCombo.setCurrentText(currentTag)
                 else:
                     tagCombo.addItem("")  # Only empty option when None selected
+
+    def onDescriptionCategoryChanged(self, category):
+        """Handle description category change - update description tag dropdown"""
+        tags = self.descriptionCategories.get(category, [])
+
+        # Clear and repopulate the description tag dropdown
+        self.cb_descriptionTag.clear()
+
+        if tags:
+            self.cb_descriptionTag.addItems(tags)
+            # Auto-select the first tag
+            self.cb_descriptionTag.setCurrentIndex(0)
+
+    def applyDescriptionTagToSelected(self):
+        """Apply the selected description tag to all selected rows in the table"""
+        selectedTag = self.cb_descriptionTag.currentText()
+
+        # Get selected rows
+        selectedRows = set(index.row() for index in self.tw_objects.selectedIndexes())
+
+        if not selectedRows:
+            self.core.popup("Please select at least one object in the table", title="No Objects Selected")
+            return
+
+        # Apply tag to all selected rows
+        for row in selectedRows:
+            descLineEdit = self.tw_objects.cellWidget(row, 1)  # Description is column 1
+            if descLineEdit:
+                descLineEdit.setText(selectedTag)
+
+        print(f"Applied description tag '{selectedTag}' to {len(selectedRows)} object(s)")
+        self.updatePreview()
+
+    def applyVariantToSelected(self):
+        """Apply the selected variant number to all selected rows in the table"""
+        variantNumber = self.sb_variantNumber.value()
+
+        # Get selected rows
+        selectedRows = set(index.row() for index in self.tw_objects.selectedIndexes())
+
+        if not selectedRows:
+            self.core.popup("Please select at least one object in the table", title="No Objects Selected")
+            return
+
+        # Apply variant number to all selected rows
+        for row in selectedRows:
+            variantSpinBox = self.tw_objects.cellWidget(row, 2)  # Variant is column 2
+            if variantSpinBox:
+                variantSpinBox.setValue(variantNumber)
+
+        print(f"Applied variant number {variantNumber} to {len(selectedRows)} object(s)")
+        self.updatePreview()
 
     def freeze_transforms(self, obj):
         mw = obj.matrix_world.copy()
@@ -759,28 +895,37 @@ class ModelCreationDialog(QDialog):
                 row = self.tw_objects.rowCount()
                 self.tw_objects.insertRow(row)
 
-                # Add object name to first column
+                # Add object name to first column (bold font)
                 nameItem = QTableWidgetItem(obj.name)
                 nameItem.setFlags(nameItem.flags() & ~Qt.ItemIsEditable)  # Make read-only
+                font = nameItem.font()
+                font.setBold(True)
+                nameItem.setFont(font)
                 self.tw_objects.setItem(row, 0, nameItem)
 
-                # Add description line edit to second column (use dialog's description field as default)
+                # Add description line edit to second column (use selected description tag as default)
                 descLineEdit = QLineEdit()
-                descLineEdit.setText(self.e_description.text().strip())
+                # Ensure there's always a description, default to "default" if empty
+                currentDescTag = self.cb_descriptionTag.currentText()
+                descLineEdit.setText(currentDescTag if currentDescTag else "default")
                 descLineEdit.setToolTip("Descripción para este objeto")
                 descLineEdit.textChanged.connect(self.updatePreview)  # Update preview when description changes
+                # Set white text color
+                descLineEdit.setStyleSheet("QLineEdit { color: white; }")
                 self.tw_objects.setCellWidget(row, 1, descLineEdit)
 
-                # Add variant spinbox to third column
+                # Add variant spinbox to third column (white text)
                 variantSpinBox = QSpinBox()
                 variantSpinBox.setMinimum(1)
                 variantSpinBox.setMaximum(9999)
                 variantSpinBox.setValue(self.sb_variantNumber.value())  # Use global variant as default
                 variantSpinBox.setToolTip("Número de variante para este objeto")
                 variantSpinBox.valueChanged.connect(self.updatePreview)  # Update preview when variant changes
+                # Set white text color
+                variantSpinBox.setStyleSheet("QSpinBox { color: white; }")
                 self.tw_objects.setCellWidget(row, 2, variantSpinBox)
 
-                # Add tag dropdown to fourth column
+                # Add tag dropdown to fourth column (white text)
                 tagCombo = QComboBox()
                 if currentCategory != "None" and tags:
                     tagCombo.addItem("")  # Empty option
@@ -789,6 +934,8 @@ class ModelCreationDialog(QDialog):
                     tagCombo.addItem("")  # Only empty option when None selected
 
                 tagCombo.currentTextChanged.connect(self.updatePreview)  # Update preview when tag changes
+                # Set white text color
+                tagCombo.setStyleSheet("QComboBox { color: white; }")
                 self.tw_objects.setCellWidget(row, 3, tagCombo)
 
                 addedCount += 1
