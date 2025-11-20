@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(prismRoot, "Scripts"))
 from qtpy.QtCore import *
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
-from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox, QRadioButton, QGroupBox, QSplitter
+from qtpy.QtWidgets import QListWidgetItem, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QSpinBox, QRadioButton, QGroupBox, QSplitter, QLineEdit
 
 # Get the Blender version to determine the correct region
 if bpy.app.version < (2, 80, 0):
@@ -153,7 +153,7 @@ class ModelCreationDialog(QDialog):
 
     def setupUi(self):
         self.setWindowTitle("Create Model")
-        self.resize(250, 500)
+        self.resize(500, 500)
 
         # Set window flags to stay on top but allow interaction with Blender
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
@@ -224,14 +224,15 @@ class ModelCreationDialog(QDialog):
         self.gb_objects = QGroupBox("Objects (Meshes and Curves)")
         objectsLayout = QVBoxLayout(self.gb_objects)
 
-        # Table widget for objects with variant and tag columns
+        # Table widget for objects with description, variant and tag columns
         self.tw_objects = QTableWidget()
-        self.tw_objects.setColumnCount(3)
-        self.tw_objects.setHorizontalHeaderLabels(["Object Name", "Variant", "Tag"])
+        self.tw_objects.setColumnCount(4)
+        self.tw_objects.setHorizontalHeaderLabels(["Object Name", "Description", "Variant", "Tag"])
         self.tw_objects.horizontalHeader().setStretchLastSection(False)
         self.tw_objects.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.tw_objects.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tw_objects.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.tw_objects.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.tw_objects.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.tw_objects.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tw_objects.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tw_objects.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -247,10 +248,8 @@ class ModelCreationDialog(QDialog):
 
         self.splitter.addWidget(self.gb_objects)
 
-        # Preview GroupBox (collapsible with checkbox)
+        # Preview GroupBox (always visible)
         self.gb_preview = QGroupBox("Preview")
-        self.gb_preview.setCheckable(True)
-        self.gb_preview.setChecked(True)  # Expanded by default
         previewLayout = QVBoxLayout(self.gb_preview)
 
         self.l_preview = QLabel("")
@@ -322,11 +321,10 @@ class ModelCreationDialog(QDialog):
     def updatePreview(self):
         """Update the preview label based on current field values"""
         assetName = self.e_assetName.text().strip()
-        description = self.e_description.text().strip()
 
         # Show format explanation
         previewText = "Format: AssetName_Description_var###_<modelName or tag>\n"
-        previewText += "\nNote: Each object has its own variant number"
+        previewText += "\nNote: Each object has its own description and variant number"
 
         # Show examples from actual objects in the table if any exist
         if self.tw_objects.rowCount() > 0:
@@ -339,20 +337,24 @@ class ModelCreationDialog(QDialog):
                 if nameItem:
                     objName = nameItem.text()
 
-                    # Get variant
-                    variantSpinBox = self.tw_objects.cellWidget(row, 1)
+                    # Get description from column 1
+                    descLineEdit = self.tw_objects.cellWidget(row, 1)
+                    objDescription = descLineEdit.text().strip() if descLineEdit else ""
+
+                    # Get variant from column 2
+                    variantSpinBox = self.tw_objects.cellWidget(row, 2)
                     variantNum = variantSpinBox.value() if variantSpinBox else 1
 
-                    # Get tag
-                    tagCombo = self.tw_objects.cellWidget(row, 2)
+                    # Get tag from column 3
+                    tagCombo = self.tw_objects.cellWidget(row, 3)
                     tag = tagCombo.currentText() if tagCombo else ""
 
                     # Build example name
                     parts = []
                     if assetName:
                         parts.append(assetName)
-                    if description:
-                        parts.append(description)
+                    if objDescription:
+                        parts.append(objDescription)
                     if variantNum > 0:
                         parts.append(f"var{variantNum:03d}")
 
@@ -371,7 +373,7 @@ class ModelCreationDialog(QDialog):
 
         # Update all existing rows with new tag options
         for row in range(self.tw_objects.rowCount()):
-            tagCombo = self.tw_objects.cellWidget(row, 2)  # Tag is now column 2
+            tagCombo = self.tw_objects.cellWidget(row, 3)  # Tag is now column 3
             if tagCombo:
                 # Store current selection if it exists in new tags
                 currentTag = tagCombo.currentText()
@@ -413,7 +415,6 @@ class ModelCreationDialog(QDialog):
     def onOk(self):
         """Validate and create the model"""
         assetName = self.e_assetName.text().strip()
-        description = self.e_description.text().strip()
 
         # Validate asset name
         if not assetName:
@@ -461,16 +462,22 @@ class ModelCreationDialog(QDialog):
                         if col != exportCollection:
                             col.objects.unlink(assetNull)
 
-            # Step 3: Create variant group nulls for each unique variant
-            # Get object tags and variants
+            # Step 3: Create variant group nulls for each unique variant+description combination
+            # Get object tags, variants, and descriptions
             objectTags = self.getObjectTags()
             objectVariants = self.getObjectVariants()
+            objectDescriptions = self.getObjectDescriptions()
 
-            # Find all unique variants and create variant group nulls
-            uniqueVariants = set(objectVariants.values())
-            variantGroupNulls = {}  # Maps variant number to variant group null
+            # Find all unique (variant, description) combinations and create variant group nulls
+            uniqueVariantDescriptions = set()
+            for idx in range(len(selectedObjects)):
+                variantNum = objectVariants.get(idx, 1)
+                desc = objectDescriptions.get(idx, "")
+                uniqueVariantDescriptions.add((variantNum, desc))
 
-            for variantNumber in uniqueVariants:
+            variantGroupNulls = {}  # Maps (variant, description) tuple to variant group null
+
+            for variantNumber, description in uniqueVariantDescriptions:
                 # Build variant group name: AssetName_Description_var###
                 parts = []
                 if assetName:
@@ -491,7 +498,7 @@ class ModelCreationDialog(QDialog):
                 variantGroupNull.parent = assetNull
 
                 # Store reference
-                variantGroupNulls[variantNumber] = variantGroupNull
+                variantGroupNulls[(variantNumber, description)] = variantGroupNull
 
             # Step 4: Process each selected object
             usedTagNames = {}  # Track how many times each tag has been used
@@ -500,18 +507,19 @@ class ModelCreationDialog(QDialog):
                 # Get the original object name to use as modelName
                 originalName = obj.name
 
-                # Get the variant number for this object
+                # Get the variant number and description for this object
                 variantNumber = objectVariants.get(idx, 1)
+                objDescription = objectDescriptions.get(idx, "")
 
-                # Get the variant group null for this variant
-                variantGroupNull = variantGroupNulls[variantNumber]
+                # Get the variant group null for this variant+description combination
+                variantGroupNull = variantGroupNulls[(variantNumber, objDescription)]
 
                 # Build the prefix for this object: AssetName_Description_var###
                 parts = []
                 if assetName:
                     parts.append(assetName)
-                if description:
-                    parts.append(description)
+                if objDescription:
+                    parts.append(objDescription)
                 if variantNumber > 0:
                     parts.append(f"var{variantNumber:03d}")
 
@@ -583,7 +591,11 @@ class ModelCreationDialog(QDialog):
             else:
                 print("Skipping transform operations (Do Nothing selected)")
 
-            # Step 7: Create or update export state if requested
+            # Step 7: Deselect all objects before creating export state
+            bpy.ops.object.select_all(action='DESELECT')
+            print("Deselected all objects")
+
+            # Step 8: Create or update export state if requested
             if self.chb_createExportState.isChecked():
                 print("Creating/updating export state...")
                 try:
@@ -727,16 +739,23 @@ class ModelCreationDialog(QDialog):
                 nameItem.setFlags(nameItem.flags() & ~Qt.ItemIsEditable)  # Make read-only
                 self.tw_objects.setItem(row, 0, nameItem)
 
-                # Add variant spinbox to second column
+                # Add description line edit to second column (use dialog's description field as default)
+                descLineEdit = QLineEdit()
+                descLineEdit.setText(self.e_description.text().strip())
+                descLineEdit.setToolTip("Descripción para este objeto")
+                descLineEdit.textChanged.connect(self.updatePreview)  # Update preview when description changes
+                self.tw_objects.setCellWidget(row, 1, descLineEdit)
+
+                # Add variant spinbox to third column
                 variantSpinBox = QSpinBox()
                 variantSpinBox.setMinimum(1)
                 variantSpinBox.setMaximum(9999)
                 variantSpinBox.setValue(self.sb_variantNumber.value())  # Use global variant as default
                 variantSpinBox.setToolTip("Número de variante para este objeto")
                 variantSpinBox.valueChanged.connect(self.updatePreview)  # Update preview when variant changes
-                self.tw_objects.setCellWidget(row, 1, variantSpinBox)
+                self.tw_objects.setCellWidget(row, 2, variantSpinBox)
 
-                # Add tag dropdown to third column
+                # Add tag dropdown to fourth column
                 tagCombo = QComboBox()
                 if currentCategory != "None" and tags:
                     tagCombo.addItem("")  # Empty option
@@ -745,7 +764,7 @@ class ModelCreationDialog(QDialog):
                     tagCombo.addItem("")  # Only empty option when None selected
 
                 tagCombo.currentTextChanged.connect(self.updatePreview)  # Update preview when tag changes
-                self.tw_objects.setCellWidget(row, 2, tagCombo)
+                self.tw_objects.setCellWidget(row, 3, tagCombo)
 
                 addedCount += 1
                 print(f"DEBUG: Added {obj.name} to table")
@@ -791,11 +810,22 @@ class ModelCreationDialog(QDialog):
         """Return the list of selected objects with their tags"""
         return self.objects
 
+    def getObjectDescriptions(self):
+        """Return a dictionary mapping object indices to their descriptions"""
+        descriptions = {}
+        for row in range(self.tw_objects.rowCount()):
+            descLineEdit = self.tw_objects.cellWidget(row, 1)  # Description is column 1
+            if descLineEdit:
+                desc = descLineEdit.text().strip()
+                if desc:  # Only include non-empty descriptions
+                    descriptions[row] = desc
+        return descriptions
+
     def getObjectTags(self):
         """Return a dictionary mapping object indices to their selected tags"""
         tags = {}
         for row in range(self.tw_objects.rowCount()):
-            tagCombo = self.tw_objects.cellWidget(row, 2)  # Tag is now column 2
+            tagCombo = self.tw_objects.cellWidget(row, 3)  # Tag is now column 3
             if tagCombo:
                 tag = tagCombo.currentText()
                 if tag:  # Only include non-empty tags
@@ -806,7 +836,7 @@ class ModelCreationDialog(QDialog):
         """Return a dictionary mapping object indices to their variant numbers"""
         variants = {}
         for row in range(self.tw_objects.rowCount()):
-            variantSpinBox = self.tw_objects.cellWidget(row, 1)  # Variant is column 1
+            variantSpinBox = self.tw_objects.cellWidget(row, 2)  # Variant is now column 2
             if variantSpinBox:
                 variants[row] = variantSpinBox.value()
         return variants
