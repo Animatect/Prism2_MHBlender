@@ -461,10 +461,39 @@ class ModelCreationDialog(QDialog):
                         if col != exportCollection:
                             col.objects.unlink(assetNull)
 
-            # Step 3: Process each selected object with per-object variants
+            # Step 3: Create variant group nulls for each unique variant
             # Get object tags and variants
             objectTags = self.getObjectTags()
             objectVariants = self.getObjectVariants()
+
+            # Find all unique variants and create variant group nulls
+            uniqueVariants = set(objectVariants.values())
+            variantGroupNulls = {}  # Maps variant number to variant group null
+
+            for variantNumber in uniqueVariants:
+                # Build variant group name: AssetName_Description_var###
+                parts = []
+                if assetName:
+                    parts.append(assetName)
+                if description:
+                    parts.append(description)
+                if variantNumber > 0:
+                    parts.append(f"var{variantNumber:03d}")
+
+                variantGroupName = "_".join(parts) if parts else f"var{variantNumber:03d}"
+
+                # Create variant group null
+                variantGroupNull = bpy.data.objects.new(variantGroupName, None)
+                exportCollection.objects.link(variantGroupNull)
+                print(f"Created variant group null: {variantGroupName}")
+
+                # Parent variant group to asset null
+                variantGroupNull.parent = assetNull
+
+                # Store reference
+                variantGroupNulls[variantNumber] = variantGroupNull
+
+            # Step 4: Process each selected object
             usedTagNames = {}  # Track how many times each tag has been used
 
             for idx, obj in enumerate(selectedObjects):
@@ -473,6 +502,9 @@ class ModelCreationDialog(QDialog):
 
                 # Get the variant number for this object
                 variantNumber = objectVariants.get(idx, 1)
+
+                # Get the variant group null for this variant
+                variantGroupNull = variantGroupNulls[variantNumber]
 
                 # Build the prefix for this object: AssetName_Description_var###
                 parts = []
@@ -524,9 +556,9 @@ class ModelCreationDialog(QDialog):
                     obj.data.name = f"{newObjectName}_Curve"
                     print(f"Renamed curve data to: {obj.data.name}")
 
-                # Parent the object to the asset null
-                obj.parent = assetNull
-                print(f"Parented {newObjectName} to {assetNullName}")
+                # Parent the object to the variant group null
+                obj.parent = variantGroupNull
+                print(f"Parented {newObjectName} to {variantGroupNull.name}")
 
                 # Move object to export collection if not already there
                 if obj.name not in exportCollection.objects:
@@ -620,6 +652,12 @@ class ModelCreationDialog(QDialog):
             msg = f"Model created successfully!\n\n"
             msg += f"Collection: {collectionName}\n"
             msg += f"Asset Null: {assetNullName}\n"
+
+            # Show variant groups created
+            if len(variantGroupNulls) > 0:
+                msg += f"\nVariant Groups: {len(variantGroupNulls)}\n"
+                for varNum in sorted(variantGroupNulls.keys()):
+                    msg += f"  • {variantGroupNulls[varNum].name}\n"
 
             # Show which transform option was applied
             if self.rb_zeroTransforms.isChecked():
