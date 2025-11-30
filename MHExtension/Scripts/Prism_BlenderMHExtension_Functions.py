@@ -95,6 +95,62 @@ class Prism_BlenderMHExtension_Functions(object):
     def startup(self):
         pass
 
+    @err_catcher(name=__name__)
+    def exportMhUsd(self, outputName, origin, startFrame, endFrame, expNodes, catchError=True, additionalSettings=None):
+        """
+        Custom export function for .mhUsd files.
+        Exports as standard .usd file. The .mhUsd extension in Prism is just to avoid conflicts with Prism's USD plugin.
+        """
+        from _bpy import ops as _ops_module
+        additionalSettings = additionalSettings or {}
+
+        # Check if USD export is available
+        try:
+            _ops_module.as_string("WM_OT_usd_export")
+        except:
+            ext = os.path.splitext(outputName)[1]
+            msg = "Format \"%s\" is not supported in this Blender version. Exporting USD requires at least Blender 2.82" % ext
+            self.core.popup(msg)
+            return False
+
+        # Replace .mhUsd with .usd for export (Blender's USD exporter only accepts standard USD extensions)
+        actualOutputName = outputName.replace(".mhUsd", ".usd")
+
+        # Set frame range
+        self.blenderplugin.setFrameRange(origin, startFrame, endFrame)
+
+        try:
+            if bpy.app.version < (4, 0, 0):
+                bpy.ops.wm.usd_export(
+                    self.blenderplugin.getOverrideContext(origin),
+                    filepath=actualOutputName,
+                    export_animation=startFrame != endFrame,
+                    selected_objects_only=(not origin.chb_wholeScene.isChecked()),
+                    **additionalSettings,
+                )
+            else:
+                with bpy.context.temp_override(**self.blenderplugin.getOverrideContext(origin)):
+                    bpy.ops.wm.usd_export(
+                        filepath=actualOutputName,
+                        export_animation=startFrame != endFrame,
+                        selected_objects_only=(not origin.chb_wholeScene.isChecked()),
+                        **additionalSettings,
+                    )
+        except Exception as e:
+            if catchError:
+                logger.error(f"USD export failed: {e}")
+                return False
+            else:
+                raise
+
+        # Return the actual output path (with .usd extension)
+        if os.path.exists(actualOutputName):
+            logger.debug(f"Successfully exported USD to {actualOutputName}")
+            return actualOutputName
+        else:
+            logger.error("USD export did not create expected file")
+            return False
+
     # Create a new view layer
     @err_catcher(name=__name__)
     def createViewLayer(self, layername):
