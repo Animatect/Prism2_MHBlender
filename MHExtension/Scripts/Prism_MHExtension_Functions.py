@@ -78,6 +78,12 @@ class Prism_MHExtension_Functions(object):
                 self.blendFunctions = Prism_BlenderMHExtension_Functions.Prism_BlenderMHExtension_Functions(self.core, self.core.appPlugin)
                 # self.applyPatch(plugin)
                 self.core.plugins.monkeyPatch(self.core.products.getVersionStackContextFromPath, self.getVersionStackContextFromPath, self, force=True)
+                # Add custom export handler for .mhUsd files
+                self.core.appPlugin.exportHandlers[".mhUsd"] = {"exportFunction": self.core.appPlugin.exportUsd}
+                # Add .mhUsd to the output formats list if not already present
+                if ".mhUsd" not in self.core.appPlugin.outputFormats:
+                    self.core.appPlugin.outputFormats.append(".mhUsd")
+                    logger.debug("Added .mhUsd to outputFormats")
         if not self.fusFunctions:
             if self.core.appPlugin.appShortName.lower() == "fus":
                 import Prism_FusionMHExtension_Functions
