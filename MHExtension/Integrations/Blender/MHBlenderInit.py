@@ -85,6 +85,23 @@ def createExportStateStandalone(core, assetName, collectionName):
                         exportState.setProductname("Modeling")
                         print("Set product name to 'Modeling'")
 
+                    # Set the output format to .mhUsd with fallback to .abc
+                    if hasattr(exportState, 'setOutputType'):
+                        # Try .mhUsd first
+                        if hasattr(exportState, 'cb_outType'):
+                            idx = exportState.cb_outType.findText(".mhUsd")
+                            if idx != -1:
+                                exportState.setOutputType(".mhUsd")
+                                print("Set output format to '.mhUsd'")
+                            else:
+                                # Fallback to .abc
+                                idx = exportState.cb_outType.findText(".abc")
+                                if idx != -1:
+                                    exportState.setOutputType(".abc")
+                                    print("Set output format to '.abc' (fallback)")
+                                else:
+                                    print("Neither .mhUsd nor .abc format available")
+
                     # Add the ASSET_<AssetName>_EXPORT collection to the export state
                     assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
                     if assetExportCollection:
