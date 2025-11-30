@@ -38,7 +38,9 @@ class Prism_MHExtension_Functions(object):
         self.core.registerCallback("userSettings_loadUI", self.onUserSettings_loadUI, plugin=self)
         self.core.registerCallback("onStateManagerOpen", self.onStateManagerOpen, plugin=self)
         self.core.registerCallback("pluginLoaded", self.onPluginLoaded, plugin=self)
-        
+        # Register callback for ProductBrowser
+        self.core.registerCallback("onProductBrowserOpen", self.onProductBrowserOpen, plugin=self.plugin)
+
         self.core.registerCallback("userSettings_saveSettings",self.userSettings_saveSettings,plugin=self.plugin,)
         self.core.registerCallback("userSettings_loadSettings",self.userSettings_loadSettings,plugin=self.plugin,)
 
@@ -80,7 +82,85 @@ class Prism_MHExtension_Functions(object):
             if self.core.appPlugin.appShortName.lower() == "fus":
                 import Prism_FusionMHExtension_Functions
                 self.fusFunctions = Prism_FusionMHExtension_Functions.Prism_FusionMHExtension_Functions(self.core, self.core.appPlugin)
-                
+
+    		
+    @err_catcher(name=__name__)
+    def onProductBrowserOpen(self, productBrowser):
+        """
+        Callback when ProductBrowser opens. Monkey patches the updateIdentifiers method
+        to automatically group usdlayer_* products under ASSET products.
+        ASSET will appear as both a selectable product AND a group containing usdlayer items.
+        """
+        logger.debug("ProductBrowser opened - applying ASSET grouping logic")
+
+        # Store the original updateIdentifiers method
+        original_updateIdentifiers = productBrowser.updateIdentifiers
+        # Store the original createGroupItems method
+        original_createGroupItems = productBrowser.createGroupItems
+
+        # Wrapper for createGroupItems to handle ASSET as both item and group
+        def custom_createGroupItems(identifiers):
+            # Call original method to get groups and group items
+            groups, groupItems = original_createGroupItems(identifiers)
+
+            # Find if ASSET exists and if there are usdlayer_* products grouped under it
+            if "ASSET" in groupItems and "ASSET" in identifiers:
+                # Replace the group-only item with a hybrid item
+                assetGroupItem = groupItems["ASSET"]
+                assetData = identifiers["ASSET"]
+
+                # Clear the "isGroup" flag and add the actual product data
+                assetGroupItem.setData(0, Qt.UserRole, assetData)
+
+                # Update the display text to show it's a product (remove folder-only appearance)
+                assetGroupItem.setText(0, "ASSET")
+
+                logger.debug("Modified ASSET to be both group and selectable product")
+
+            return groups, groupItems
+
+        # Create wrapper function that adds our custom grouping logic
+        def custom_updateIdentifiers(item=None, restoreSelection=False):
+            # Get all identifiers before modification
+            identifiers = productBrowser.getIdentifiers()
+
+            # Auto-group usdlayer_* products under ASSET
+            for identifierName in list(identifiers.keys()):
+                # Check if this is a usdlayer_* product
+                if identifierName.startswith("usdlayer_"):
+                    # Check if ASSET product exists in the same entity
+                    if "ASSET" in identifiers:
+                        # Set the group for this usdlayer product
+                        self.core.products.setProductsGroup(
+                            [identifiers[identifierName]],
+                            group="ASSET"
+                        )
+                        logger.debug(f"Auto-grouped {identifierName} under ASSET")
+
+            # Call the original updateIdentifiers method
+            # Handle both function signatures (with or without 'item' parameter)
+            import inspect
+            try:
+                sig = inspect.signature(original_updateIdentifiers)
+                params = list(sig.parameters.keys())
+
+                # Call with appropriate parameters based on signature
+                if 'item' in params:
+                    original_updateIdentifiers(item=item, restoreSelection=restoreSelection)
+                else:
+                    original_updateIdentifiers(restoreSelection=restoreSelection)
+            except:
+                # Fallback: try calling with just restoreSelection
+                try:
+                    original_updateIdentifiers(restoreSelection=restoreSelection)
+                except:
+                    # Last resort: call with no arguments
+                    original_updateIdentifiers()
+
+        # Replace both methods with our custom versions
+        productBrowser.createGroupItems = custom_createGroupItems
+        productBrowser.updateIdentifiers = custom_updateIdentifiers
+
     @err_catcher(name=__name__)
     def is_object_excluded_from_view_layer(self, obj):
         import bpy
