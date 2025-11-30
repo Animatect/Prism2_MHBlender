@@ -80,6 +80,11 @@ def createExportStateStandalone(core, assetName, collectionName):
                 if stateItem and hasattr(stateItem, 'ui'):
                     exportState = stateItem.ui
 
+                    # Set the product name to "Modeling"
+                    if hasattr(exportState, 'setProductname'):
+                        exportState.setProductname("Modeling")
+                        print("Set product name to 'Modeling'")
+
                     # Add the ASSET_<AssetName>_EXPORT collection to the export state
                     assetExportCollection = bpy.data.collections.get(f"ASSET_{assetName}_EXPORT")
                     if assetExportCollection:
