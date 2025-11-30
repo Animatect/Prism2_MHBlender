@@ -115,6 +115,15 @@ class Prism_MHExtension_Functions(object):
                 # Update the display text to show it's a product (remove folder-only appearance)
                 assetGroupItem.setText(0, "ASSET")
 
+                # Set custom icon for ASSET
+                iconPath = r"C:\Users\ecovo\Documents\GitHub\Prism2_MHBlender\MHExtension\Integrations\Icons\addasset.svg"
+                if os.path.exists(iconPath):
+                    icon = self.core.media.getColoredIcon(iconPath)
+                    assetGroupItem.setIcon(0, icon)
+                    logger.debug(f"Set custom icon for ASSET from: {iconPath}")
+                else:
+                    logger.warning(f"ASSET icon not found at: {iconPath}")
+
                 logger.debug("Modified ASSET to be both group and selectable product")
 
             return groups, groupItems
