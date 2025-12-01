@@ -84,9 +84,11 @@ class Prism_MHExtension_Products:
             identifiers = productBrowser.getIdentifiers()
 
             # Auto-group usdlayer_* products under ASSET
+            hasUsdLayers = False
             for identifierName in list(identifiers.keys()):
                 # Check if this is a usdlayer_* product
                 if identifierName.startswith("usdlayer_"):
+                    hasUsdLayers = True
                     # Check if ASSET product exists in the same entity
                     if "ASSET" in identifiers:
                         # Set the group for this usdlayer product
@@ -95,6 +97,17 @@ class Prism_MHExtension_Products:
                             group="ASSET"
                         )
                         logger.debug(f"Auto-grouped {identifierName} under ASSET")
+
+            # If ASSET has usdlayer children, mark it as a group to prevent duplicate
+            # The custom_createGroupItems will convert it to a hybrid item/group
+            if hasUsdLayers and "ASSET" in identifiers:
+                # Mark ASSET as a group so it won't appear as a standalone item
+                # It will only appear through the group item created in custom_createGroupItems
+                self.core.products.setProductsGroup(
+                    [identifiers["ASSET"]],
+                    group="ASSET"  # Group it under itself
+                )
+                logger.debug("Marked ASSET as group to prevent duplicate display")
 
             # Call the original updateIdentifiers method
             # Handle both function signatures (with or without 'item' parameter)
