@@ -83,6 +83,15 @@ class Prism_MHExtension_Functions(object):
                 
     @err_catcher(name=__name__)
     def onPluginLoaded(self, plugin):
+        # Apply USD master version patch (applies to all apps, not just Blender)
+        self.core.plugins.monkeyPatch(
+            self.core.products.updateMasterVersion,
+            self.productsManager.updateMasterVersion,
+            self,
+            force=True
+        )
+        logger.debug("Applied USD master version monkey patch")
+
         if not self.blendFunctions:
             if self.core.appPlugin.appShortName.lower() == "bld":
                 import Prism_BlenderMHExtension_Functions
