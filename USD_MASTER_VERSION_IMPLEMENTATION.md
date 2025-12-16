@@ -112,28 +112,60 @@ The function automatically determines the defaultPrim name:
 ✅ **Backward Compatible**: Non-USD files use standard Prism behavior
 ✅ **Relative Paths**: References use `../v0024/file.usdc` format for portability
 
+## Configuration
+
+### Settings Location
+
+Open **Prism Settings → MH Prism Extension** tab to configure USD master behavior.
+
+**USD Master Version Settings:**
+- ✅ **Use referenced files as master on USD files** (checkbox)
+  - **Enabled** (default): Creates lightweight reference files for USD masters
+  - **Disabled**: Uses standard Prism copy/hardlink behavior for USD files
+
+The setting is saved in Prism's user configuration and persists across sessions.
+
+### How to Enable/Disable
+
+1. Open Prism Settings
+2. Navigate to "MH Prism Extension" tab
+3. Scroll to "USD Master Version Settings" section
+4. Check/uncheck "Use referenced files as master on USD files"
+5. Click "Save" to apply changes
+
+**Note**: Changing this setting only affects future master versions. Existing masters are not modified.
+
 ## Testing
 
 To test the implementation:
 
-1. **Create a USD product version**:
+1. **Enable the setting** (if not already):
+   - Open Prism Settings → MH Prism Extension
+   - Ensure "Use referenced files as master on USD files" is checked
+
+2. **Create a USD product version**:
    - In Blender, export a USD file (usdlayer_geo, usdlayer_mtl, or ASSET)
    - Make sure it's saved with a version number
 
-2. **Set as master** (two ways):
+3. **Set as master** (two ways):
    - **Manual**: Right-click version in Product Browser → "Set as master"
    - **Automatic**: Enable "Update Master Version" checkbox in Export state
 
-3. **Verify master file**:
+4. **Verify master file**:
    - Navigate to master folder
    - Open the `.usda` file in a text editor
    - Should see USD reference format with relative path
    - Should NOT see copied USD files (only reference file + version info)
 
-4. **Test in USD application**:
+5. **Test in USD application**:
    - Open master file in Blender, Houdini, or USD viewer
    - Should resolve reference and show geometry
    - Change source version and verify master updates
+
+6. **Test with setting disabled**:
+   - Disable "Use referenced files as master on USD files" in settings
+   - Create new master version
+   - Verify USD file is copied/hardlinked (standard behavior)
 
 ## Example Output
 

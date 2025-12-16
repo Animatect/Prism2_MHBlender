@@ -177,7 +177,8 @@ class Prism_MHExtension_Products:
         instead of copying the actual files.
 
         For .usda, .usdc, or .usd files:
-        - Creates a master .usda file that references the versioned file
+        - If useUsdReferences setting is enabled: Creates a master .usda reference file
+        - If useUsdReferences setting is disabled: Uses standard copy/hardlink behavior
         - Copies version info and other metadata files normally
 
         For all other formats:
@@ -193,9 +194,13 @@ class Prism_MHExtension_Products:
         # Check if this is a USD file
         isUsdFile = ext in ['.usda', '.usdc', '.usd']
 
-        if not isUsdFile:
-            # Not a USD file - use original behavior
-            logger.debug(f"Non-USD file {ext}, using original updateMasterVersion")
+        # Check user setting for USD reference behavior
+        useUsdReferences = self.plugin.getUseUsdReferences() if hasattr(self.plugin, 'getUseUsdReferences') else True
+
+        if not isUsdFile or not useUsdReferences:
+            # Not a USD file OR user disabled USD reference mode - use original behavior
+            reason = f"Non-USD file {ext}" if not isUsdFile else f"USD references disabled in settings"
+            logger.debug(f"{reason}, using original updateMasterVersion")
             return self.core.plugins.callUnpatchedFunction(
                 self.core.products.updateMasterVersion, path
             )

@@ -182,6 +182,35 @@ class Prism_MHExtension_Integration(object):
 		lo_MHExtension.addWidget(self.gb_BlenderConfig, alignment=Qt.AlignTop)
 
 		############################################
+		# USD MASTER VERSION SETTINGS
+		self.gb_UsdConfig = QGroupBox()
+		self.gb_UsdConfig.setTitle("USD Master Version Settings")
+		lo_UsdConfig = QVBoxLayout(self.gb_UsdConfig)
+		lo_UsdConfig.setSpacing(5)
+		lo_UsdConfig.setContentsMargins(10, 10, 10, 10)
+
+		# Checkbox for USD reference behavior
+		self.chb_useUsdReferences = QCheckBox("Use referenced files as master on USD files")
+		self.chb_useUsdReferences.setToolTip(
+			"When enabled, master versions of USD files (.usda, .usdc, .usd) will be created as lightweight reference files "
+			"instead of copying the actual USD data. This saves disk space and allows updates to propagate automatically.\n\n"
+			"When disabled, USD files will be copied/hardlinked like any other file format."
+		)
+		self.chb_useUsdReferences.setChecked(True)  # Default to enabled
+		lo_UsdConfig.addWidget(self.chb_useUsdReferences)
+
+		# Add info label
+		l_UsdInfo = QLabel(
+			"Note: When using references, master files will be small .usda files that reference the versioned file.\n"
+			"This is the recommended setting for USD workflows."
+		)
+		l_UsdInfo.setStyleSheet("font-size: 8pt; color: gray;")
+		l_UsdInfo.setWordWrap(True)
+		lo_UsdConfig.addWidget(l_UsdInfo)
+
+		lo_MHExtension.addWidget(self.gb_UsdConfig, alignment=Qt.AlignTop)
+
+		############################################
 
 		# ADD MENU ENTRY TO SETTINGS UI
 		origin.addTab(origin.w_MHExtension, "MH Prism Extension")
@@ -596,6 +625,7 @@ class Prism_MHExtension_Integration(object):
 
 			settings["MHExtension"]["FusionDir"] = self.e_FusionDir.text()
 			settings["MHExtension"]["BlenderDir"] = self.e_BlenderDir.text()
+			settings["MHExtension"]["useUsdReferences"] = self.chb_useUsdReferences.isChecked()
 
 
 		except Exception as e:
@@ -611,7 +641,35 @@ class Prism_MHExtension_Integration(object):
 					self.e_FusionDir.setText(settings["MHExtension"]["FusionDir"])
 				if "BlenderDir" in settings["MHExtension"]:
 					self.e_BlenderDir.setText(settings["MHExtension"]["BlenderDir"])
+				if "useUsdReferences" in settings["MHExtension"]:
+					self.chb_useUsdReferences.setChecked(settings["MHExtension"]["useUsdReferences"])
+				else:
+					# Default to True if setting doesn't exist
+					self.chb_useUsdReferences.setChecked(True)
 
 		except Exception as e:
 			logger.warning(f"ERROR: Failed to load user settings:\n{e}")
+
+	@err_catcher(name=__name__)
+	def getUseUsdReferences(self):
+		"""
+		Get the current setting for using USD references in master versions.
+		Returns True if USD reference mode is enabled, False otherwise.
+		Defaults to True if setting hasn't been initialized.
+		"""
+		try:
+			# Try to get from UI widget if it exists
+			if hasattr(self, 'chb_useUsdReferences'):
+				return self.chb_useUsdReferences.isChecked()
+
+			# Fallback: read from config
+			settings = self.core.getConfig(cat="MHExtension", param="useUsdReferences")
+			if settings is not None:
+				return settings
+
+			# Default to True
+			return True
+		except Exception as e:
+			logger.warning(f"ERROR: Failed to get useUsdReferences setting: {e}")
+			return True  # Default to enabled on error
 

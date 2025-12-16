@@ -283,15 +283,18 @@ self.core.plugins.monkeyPatch(
 
 ### Behavior
 
-**For USD files (.usda, .usdc, .usd):**
+**For USD files (.usda, .usdc, .usd) - when "Use referenced files as master" is enabled:**
 1. Creates a master `.usda` file that references the versioned file
 2. Master file uses relative paths: `@../v0024/file_v0024.usdc@`
 3. Extracts and preserves USD metadata (fps, upAxis, metersPerUnit)
 4. Copies version info and non-USD files normally
 5. Skips copying actual USD files (saves disk space)
 
-**For all other file types:**
+**For USD files - when setting is disabled:**
 - Falls back to standard Prism behavior (copy or hardlink)
+
+**For all other file types:**
+- Always uses standard Prism behavior (copy or hardlink)
 
 ### USD Master File Format
 
@@ -331,12 +334,19 @@ def "configure_geo_layer" (
 - Uses regex to extract: fps, metersPerUnit, timeCodesPerSecond, upAxis
 - Falls back to defaults if parsing fails (24 fps, 1m unit, Y-up)
 
+**Configuration:**
+- Setting location: **Prism Settings → MH Prism Extension → USD Master Version Settings**
+- Checkbox: "Use referenced files as master on USD files"
+- Default: **Enabled** (recommended for USD workflows)
+- Changes apply to future master versions only
+
 **Benefits:**
 - ✅ Saves disk space (references instead of copies)
 - ✅ Updates propagate automatically (master always references latest)
 - ✅ Works with any USD-aware application
 - ✅ Preserves metadata from source files
 - ✅ Compatible with USD composition arcs
+- ✅ User-configurable via settings UI
 
 ## Related Documentation
 
