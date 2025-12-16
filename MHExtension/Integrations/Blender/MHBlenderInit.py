@@ -154,6 +154,36 @@ def _register_classes():
 _active_dialogs = []
 
 
+def convertToCamelCase(text):
+    """Convert text with underscores, spaces, or hyphens to camelCase.
+
+    Examples:
+        "hello_world" -> "helloWorld"
+        "some long name" -> "someLongName"
+        "my-asset-name" -> "myAssetName"
+        "mixed_test-case name" -> "mixedTestCaseName"
+        "already_camelCase" -> "alreadyCamelCase"
+    """
+    if not text:
+        return text
+
+    # Check if text contains any separators that need conversion
+    if '_' not in text and ' ' not in text and '-' not in text:
+        return text
+
+    # Replace all separators with a common one (underscore) for uniform processing
+    normalized = text.replace(' ', '_').replace('-', '_')
+
+    # Split by underscore and filter out empty strings
+    parts = [part for part in normalized.split('_') if part]
+
+    if not parts:
+        return text
+
+    # First part stays lowercase, capitalize first letter of remaining parts
+    return parts[0].lower() + ''.join(word.capitalize() for word in parts[1:])
+
+
 class EntitySelectionDialog(QDialog):
     """Dialog for selecting an entity (asset or shot) using EntityWidget"""
 
@@ -478,6 +508,22 @@ class ModelCreationDialog(QDialog):
         # Auto-populate with currently selected objects
         self.addObjects()
 
+    def validateTag(self, comboBox, text):
+        """Validate tag input and auto-convert underscores, spaces, or hyphens to camelCase"""
+        # Safety check: ensure we have the table widget initialized
+        if not hasattr(self, 'tw_objects'):
+            return
+
+        # Check if text contains any illegal separators
+        if '_' in text or ' ' in text or '-' in text:
+            # Auto-convert to camelCase
+            camelCaseText = convertToCamelCase(text)
+            # Block signals to prevent recursion
+            comboBox.blockSignals(True)
+            comboBox.setEditText(camelCaseText)
+            comboBox.blockSignals(False)
+            print(f"Auto-converted tag: {text} -> {camelCaseText}")
+
     def updatePreview(self):
         """Update the preview label based on current field values"""
         assetName = self.e_assetName.text().strip()
@@ -541,11 +587,18 @@ class ModelCreationDialog(QDialog):
 
                 if category != "None" and tags:
                     tagCombo.addItem("")  # Add empty option
-                    tagCombo.addItems(tags)
+                    # Convert preset tags to camelCase if needed
+                    convertedTags = [convertToCamelCase(t) if ('_' in t or ' ' in t or '-' in t) else t for t in tags]
+                    tagCombo.addItems(convertedTags)
 
-                    # Restore previous selection if still valid
-                    if currentTag in tags:
+                    # Restore previous selection if still valid (check both original and converted)
+                    if currentTag in convertedTags:
                         tagCombo.setCurrentText(currentTag)
+                    elif currentTag in tags:
+                        # Current tag was in original form, try converted form
+                        convertedCurrent = convertToCamelCase(currentTag) if ('_' in currentTag or ' ' in currentTag or '-' in currentTag) else currentTag
+                        if convertedCurrent in convertedTags:
+                            tagCombo.setCurrentText(convertedCurrent)
                 else:
                     tagCombo.addItem("")  # Only empty option when None selected
 
@@ -626,6 +679,11 @@ class ModelCreationDialog(QDialog):
 
     def onOk(self):
         """Validate and create the model"""
+        print("="*80)
+        print("MHBlenderInit.py - onOk() - VERSION CHECK: 2024-12-15-v4-AllSeparators")
+        print(f"Module file location: {__file__}")
+        print("="*80)
+
         assetName = self.e_assetName.text().strip()
 
         # Validate asset name
@@ -715,13 +773,18 @@ class ModelCreationDialog(QDialog):
             # Step 4: Process each selected object
             usedTagNames = {}  # Track how many times each tag has been used
 
+            # Debug: Print objectTags dictionary
+            print(f"DEBUG: objectTags dictionary: {objectTags}")
+
             for idx, obj in enumerate(selectedObjects):
                 # Get the original object name to use as modelName
                 originalName = obj.name
+                print(f"\n--- Processing object {idx}: '{originalName}' ---")
 
                 # Get the variant number and description for this object
                 variantNumber = objectVariants.get(idx, 1)
                 objDescription = objectDescriptions.get(idx, "")
+                print(f"DEBUG: variantNumber={variantNumber}, objDescription='{objDescription}'")
 
                 # Get the variant group null for this variant+description combination
                 variantGroupNull = variantGroupNulls[(variantNumber, objDescription)]
@@ -736,10 +799,21 @@ class ModelCreationDialog(QDialog):
                     parts.append(objDescription)
 
                 objectPrefix = "_".join(parts) if parts else ""
+                print(f"DEBUG: objectPrefix='{objectPrefix}'")
 
                 # Check if this object has a tag assigned
+                print(f"DEBUG: Checking if idx {idx} is in objectTags: {idx in objectTags}")
                 if idx in objectTags:
                     tag = objectTags[idx]
+                    print(f"DEBUG: Tag selected for object '{originalName}': '{tag}'")
+
+                    # Convert tag to camelCase if it contains illegal separators
+                    if '_' in tag or ' ' in tag or '-' in tag:
+                        print(f"DEBUG: Found illegal separator in tag: '{tag}'")
+                        tag = convertToCamelCase(tag)
+                        print(f"Converted tag to camelCase: {objectTags[idx]} -> {tag}")
+                    else:
+                        print(f"DEBUG: No illegal separators in tag: '{tag}'")
 
                     # Build key for tracking this tag with this variant
                     tagKey = f"{objectPrefix}_{tag}"
@@ -760,6 +834,15 @@ class ModelCreationDialog(QDialog):
                 else:
                     # No tag selected, use original object name
                     modelName = originalName
+                    print(f"DEBUG: No tag selected. Original object name: '{originalName}'")
+
+                    # Convert modelName to camelCase if it contains illegal separators
+                    if '_' in modelName or ' ' in modelName or '-' in modelName:
+                        print(f"DEBUG: Found illegal separator in modelName: '{modelName}'")
+                        modelName = convertToCamelCase(modelName)
+                        print(f"Converted object name to camelCase: {originalName} -> {modelName}")
+                    else:
+                        print(f"DEBUG: No illegal separators found in modelName: '{modelName}'")
 
                 # Build the new object name: prefix_modelName
                 newObjectName = f"{objectPrefix}_{modelName}" if objectPrefix else modelName
@@ -942,12 +1025,17 @@ class ModelCreationDialog(QDialog):
 
                 # Add tag dropdown to fourth column (white text)
                 tagCombo = QComboBox()
+                tagCombo.setEditable(True)  # Allow custom tags
                 if currentCategory != "None" and tags:
                     tagCombo.addItem("")  # Empty option
-                    tagCombo.addItems(tags)
+                    # Convert preset tags to camelCase if needed
+                    convertedTags = [convertToCamelCase(t) if ('_' in t or ' ' in t or '-' in t) else t for t in tags]
+                    tagCombo.addItems(convertedTags)
                 else:
                     tagCombo.addItem("")  # Only empty option when None selected
 
+                # Add validator to prevent underscores in custom tags
+                tagCombo.lineEdit().textChanged.connect(lambda text, cb=tagCombo: self.validateTag(cb, text))
                 tagCombo.currentTextChanged.connect(self.updatePreview)  # Update preview when tag changes
                 # Set white text color
                 tagCombo.setStyleSheet("QComboBox { color: white; }")
