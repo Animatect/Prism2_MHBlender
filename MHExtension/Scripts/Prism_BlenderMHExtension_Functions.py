@@ -151,6 +151,41 @@ class Prism_BlenderMHExtension_Functions(object):
             logger.error("USD export did not create expected file")
             return False
 
+    @err_catcher(name=__name__)
+    def exportAbsBlend(self, outputName, origin, startFrame, endFrame, expNodes, catchError=True, additionalSettings=None):
+        """
+        Custom export function for .absBlend files.
+        Saves a copy of the current .blend file as-is (no object stripping), like a Ctrl+S to a versioned product.
+        The .absBlend extension is just a marker — the actual file written has .blend extension.
+        """
+        actualOutputName = outputName.replace(".absBlend", ".blend")
+
+        currentFile = self.core.getCurrentFileName()
+        if not currentFile or not os.path.exists(currentFile):
+            msg = "Current scene is not saved to disk. Save the scene before exporting an absBlend."
+            self.core.popup(msg)
+            return False
+
+        # Save the working scene first so the copy reflects the latest state.
+        self.core.saveScene(versionUp=False, prismReq=False)
+        currentFile = self.core.getCurrentFileName()
+
+        try:
+            shutil.copyfile(currentFile, actualOutputName)
+        except Exception as e:
+            if catchError:
+                logger.error(f"absBlend export failed: {e}")
+                return False
+            else:
+                raise
+
+        if os.path.exists(actualOutputName):
+            logger.debug(f"Successfully exported absBlend to {actualOutputName}")
+            return actualOutputName
+        else:
+            logger.error("absBlend export did not create expected file")
+            return False
+
     # Create a new view layer
     @err_catcher(name=__name__)
     def createViewLayer(self, layername):

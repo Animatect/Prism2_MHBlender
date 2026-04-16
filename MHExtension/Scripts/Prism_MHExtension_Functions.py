@@ -105,6 +105,12 @@ class Prism_MHExtension_Functions(object):
                     self.core.appPlugin.outputFormats.append(".mhUsd")
                     logger.debug("Added .mhUsd to outputFormats")
 
+                # Add custom export handler for .absBlend files (saves current blend as-is, no object stripping)
+                self.core.appPlugin.exportHandlers[".absBlend"] = {"exportFunction": self.blendFunctions.exportAbsBlend}
+                if ".absBlend" not in self.core.appPlugin.outputFormats:
+                    self.core.appPlugin.outputFormats.append(".absBlend")
+                    logger.debug("Added .absBlend to outputFormats")
+
                 # Initialize USD export state module
                 if not self.usdExportState:
                     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "Integrations", "Blender"))

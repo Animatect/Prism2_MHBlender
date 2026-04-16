@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(dir \"C:\\Program Files\\Prism2\\Scripts\\ProjectScripts\\StateManagerNodes\" /b)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Read(//c/ProgramData/Prism2/**)",
+      "Read(//c/Users/ecovo/AppData/**)",
+      "Read(//c/Users/ecovo/Documents/**)"
     ],
     "deny": [],
     "ask": []
